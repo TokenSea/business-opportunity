@@ -9,7 +9,7 @@ export async function GET() {
   if (auth.error) return auth.error;
   const rows = await prisma.opportunity.findMany({
     orderBy: { createdAt: "desc" },
-    include: { attachments: { select: { id: true, originalName: true } } },
+    include: { attachments: { select: { id: true, originalName: true, mimeType: true } } },
   });
   return NextResponse.json(rows);
 }
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
       });
       if (input.attachmentIds.length) {
         await tx.attachment.updateMany({
-          where: { id: { in: input.attachmentIds }, uploadedById: auth.user.id },
+          where: { id: { in: input.attachmentIds }, uploadedById: auth.user.id, opportunityId: null, contractId: null, paymentId: null },
           data: { opportunityId: opportunity.id },
         });
       }
@@ -64,26 +64,32 @@ export async function DELETE(request: Request) {
       where: { id: { in: ids } },
       select: {
         id: true,
-        attachments: { select: { filePath: true } },
-        contracts: { select: { recordFile: { select: { id: true, filePath: true } } } },
-        payments: { select: { recordFile: { select: { id: true, filePath: true } } } },
+        attachments: { select: { id: true, filePath: true } },
+        contracts: { select: {
+          recordFile: { select: { id: true, filePath: true } },
+          attachments: { select: { id: true, filePath: true } },
+        } },
+        payments: { select: {
+          recordFile: { select: { id: true, filePath: true } },
+          attachments: { select: { id: true, filePath: true } },
+        } },
       },
     });
     const existingIds = rows.map((row) => row.id);
-    const recordFiles = rows.flatMap((row) => [
-      ...row.contracts.map((item) => item.recordFile),
-      ...row.payments.map((item) => item.recordFile),
-    ]).filter((file): file is NonNullable<typeof file> => Boolean(file));
-    const filePaths = rows.flatMap((row) => row.attachments.map((file) => file.filePath)).concat(recordFiles.map((file) => file.filePath));
+    const files = Array.from(new Map(rows.flatMap((row) => [
+      ...row.attachments,
+      ...row.contracts.flatMap((item) => [...item.attachments, ...(item.recordFile ? [item.recordFile] : [])]),
+      ...row.payments.flatMap((item) => [...item.attachments, ...(item.recordFile ? [item.recordFile] : [])]),
+    ]).map((file) => [file.id, file])).values());
 
     await prisma.$transaction(async (tx) => {
       await tx.opportunity.deleteMany({ where: { id: { in: existingIds } } });
-      if (recordFiles.length) await tx.attachment.deleteMany({ where: { id: { in: recordFiles.map((file) => file.id) } } });
+      if (files.length) await tx.attachment.deleteMany({ where: { id: { in: files.map((file) => file.id) } } });
       if (existingIds.length) await tx.auditLog.createMany({
         data: existingIds.map((id) => ({ userId: auth.user.id, action: "DELETE", entityType: "OPPORTUNITY", entityId: id })),
       });
     });
-    await removeStoredFiles(filePaths);
+    await removeStoredFiles(files.map((file) => file.filePath));
     return NextResponse.json({ deleted: existingIds.length });
   } catch (error) {
     return apiError(error);

@@ -7,6 +7,7 @@ import { supplierUpdateSchema } from "@/lib/validators";
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") return NextResponse.json({ message: "仅管理员可以修改供应商" }, { status: 403 });
   try {
     const { id } = await context.params;
     const input = supplierUpdateSchema.parse(await request.json());

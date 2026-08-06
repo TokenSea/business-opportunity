@@ -9,16 +9,16 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params;
     const input = attachFilesSchema.parse(await request.json());
-    const opportunity = await prisma.opportunity.findUnique({
+    const contract = await prisma.contract.findUnique({
       where: { id },
       select: { id: true, _count: { select: { attachments: true } } },
     });
-    if (!opportunity) return NextResponse.json({ message: "商机不存在" }, { status: 404 });
-    if (opportunity._count.attachments + input.attachmentIds.length > 20) {
-      return NextResponse.json({ message: "每个商机最多上传 20 个附件" }, { status: 400 });
+    if (!contract) return NextResponse.json({ message: "合同不存在" }, { status: 404 });
+    if (contract._count.attachments + input.attachmentIds.length > 20) {
+      return NextResponse.json({ message: "每份合同最多上传 20 个附件" }, { status: 400 });
     }
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const attached = await prisma.$transaction(async (tx) => {
       const result = await tx.attachment.updateMany({
         where: {
           id: { in: input.attachmentIds },
@@ -27,21 +27,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           contractId: null,
           paymentId: null,
         },
-        data: { opportunityId: id },
+        data: { contractId: id },
       });
-      if (result.count !== input.attachmentIds.length) throw new Error("附件关联失败");
+      if (result.count !== input.attachmentIds.length) throw new Error("合同附件关联失败");
       await tx.auditLog.create({
-        data: {
-          userId: auth.user.id,
-          action: "UPLOAD_ATTACHMENT",
-          entityType: "OPPORTUNITY",
-          entityId: id,
-          details: { count: result.count },
-        },
+        data: { userId: auth.user.id, action: "UPLOAD_ATTACHMENT", entityType: "CONTRACT", entityId: id, details: { count: result.count } },
       });
       return result.count;
     });
-    return NextResponse.json({ attached: updated });
+    return NextResponse.json({ attached });
   } catch (error) {
     return apiError(error);
   }

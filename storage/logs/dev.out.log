@@ -10,462 +10,87 @@
      · serverActions
 
  ✓ Starting...
- ✓ Ready in 2.5s
+ ✓ Ready in 2.4s
  ○ Compiling /api/auth/login ...
- ✓ Compiled /api/auth/login in 1694ms (454 modules)
- POST /api/auth/login 200 in 1966ms
- ✓ Compiled /api/opportunities in 90ms (456 modules)
- POST /api/opportunities 201 in 179ms
- ✓ Compiled /api/suppliers in 85ms (460 modules)
- POST /api/suppliers 201 in 131ms
- ✓ Compiled /api/contracts in 82ms (462 modules)
- GET /api/contracts 200 in 130ms
- ✓ Compiled /api/payments in 77ms (464 modules)
- GET /api/payments 200 in 122ms
+ ✓ Compiled /api/auth/login in 1539ms (454 modules)
+ POST /api/auth/login 200 in 1801ms
+ ✓ Compiled /api/contracts in 102ms (459 modules)
+ GET /api/contracts 200 in 193ms
+ ✓ Compiled /api/payments in 94ms (461 modules)
+ GET /api/payments 200 in 154ms
+ ✓ Compiled /api/files/[id] in 193ms (463 modules)
+ GET /api/files/cmsh0dltc0034v1rc0wkarmo6 404 in 887ms
+ GET /api/files/cmsh0dltc0034v1rc0wkarmo6?download=1 404 in 30ms
+ ✓ Compiled /api/opportunities in 121ms (465 modules)
+ GET /api/opportunities 200 in 196ms
+ GET /api/files/cmsh7bqlc0009v1uwifswnb20 200 in 28ms
+ GET /api/files/cmsh7bqlc0009v1uwifswnb20?download=1 200 in 21ms
  ○ Compiling / ...
- ✓ Compiled / in 7.6s (2746 modules)
- GET / 307 in 3927ms
- ✓ Compiled /login in 333ms (2747 modules)
- GET /login 200 in 632ms
- POST /api/auth/login 200 in 577ms
- GET / 200 in 305ms
- GET / 200 in 259ms
- POST /api/auth/login 200 in 324ms
- GET /api/opportunities 200 in 559ms
- GET /api/payments 200 in 390ms
- GET /api/contracts 200 in 599ms
- GET /api/suppliers 200 in 404ms
- GET / 200 in 600ms
- GET / 200 in 279ms
- GET / 200 in 1392ms
- GET /api/contracts 200 in 201ms
- GET /api/opportunities 200 in 204ms
- GET /api/payments 200 in 209ms
- GET /api/suppliers 200 in 214ms
- POST /api/opportunities 201 in 78ms
- GET /api/opportunities 200 in 232ms
- GET /api/payments 200 in 293ms
- GET /api/suppliers 200 in 303ms
- GET /api/contracts 200 in 313ms
- POST /api/suppliers 201 in 93ms
- GET /api/suppliers 200 in 219ms
- GET /api/payments 200 in 236ms
- GET /api/opportunities 200 in 243ms
- GET /api/contracts 200 in 249ms
- ✓ Compiled in 463ms (2650 modules)
- GET / 200 in 97ms
- GET / 307 in 1458ms
- GET /login 200 in 1123ms
- ○ Compiling /api/auth/login ...
- ✓ Compiled /api/auth/login in 4.2s (1513 modules)
- POST /api/auth/login 200 in 5028ms
- GET / 200 in 309ms
- GET / 200 in 130ms
+ ✓ Compiled / in 6.9s (2776 modules)
+ GET / 200 in 7651ms
+ GET /api/opportunities 200 in 93ms
  ○ Compiling /api/suppliers ...
- ✓ Compiled /api/suppliers in 805ms (1515 modules)
- ✓ Compiled (1523 modules)
- GET /api/suppliers 200 in 1777ms
- GET /api/contracts 200 in 1781ms
- GET /api/payments 200 in 1780ms
- GET /api/opportunities 200 in 1806ms
- GET / 200 in 3183ms
- GET /api/opportunities 200 in 281ms
- GET /api/payments 200 in 298ms
- GET /api/contracts 200 in 307ms
- GET /api/suppliers 200 in 319ms
- GET / 200 in 71ms
- GET /api/opportunities 200 in 23ms
- GET /api/payments 200 in 79ms
- GET /api/suppliers 200 in 80ms
- GET /api/contracts 200 in 82ms
- ✓ Compiled in 4.6s (2744 modules)
- GET /api/opportunities 200 in 259ms
- GET /api/payments 200 in 453ms
- GET /api/suppliers 200 in 455ms
- GET /api/contracts 200 in 459ms
- GET / 200 in 1612ms
- GET /api/opportunities 200 in 35ms
- GET /api/payments 200 in 36ms
- GET /api/suppliers 200 in 38ms
- GET /api/contracts 200 in 39ms
- GET / 200 in 588ms
- GET /api/opportunities 200 in 195ms
- GET /api/contracts 200 in 211ms
- GET /api/payments 200 in 216ms
- GET /api/suppliers 200 in 224ms
- GET / 200 in 778ms
- GET /api/opportunities 200 in 136ms
- GET /api/payments 200 in 148ms
- GET /api/contracts 200 in 152ms
- GET /api/suppliers 200 in 155ms
- GET / 200 in 674ms
- GET /api/opportunities 200 in 135ms
- GET /api/payments 200 in 138ms
- GET /api/suppliers 200 in 141ms
- GET /api/contracts 200 in 148ms
- ✓ Compiled in 810ms (2758 modules)
- GET / 200 in 81ms
- GET /api/opportunities 200 in 61ms
- GET /api/suppliers 200 in 66ms
- GET /api/payments 200 in 69ms
- GET /api/contracts 200 in 70ms
- ✓ Compiled /api/auth/login in 132ms (1523 modules)
- POST /api/auth/login 200 in 209ms
- POST /api/opportunities 201 in 44ms
- GET / 200 in 355ms
- GET /api/opportunities 200 in 34ms
- GET /api/payments 200 in 53ms
- GET /api/suppliers 200 in 54ms
- GET /api/contracts 200 in 56ms
- GET / 200 in 733ms
- GET /api/opportunities 200 in 193ms
- GET /api/contracts 200 in 281ms
- GET /api/payments 200 in 288ms
- GET /api/suppliers 200 in 298ms
- ✓ Compiled in 489ms (2650 modules)
- GET / 200 in 108ms
- GET / 200 in 340ms
- ✓ Compiled /api/contracts in 146ms (1512 modules)
- ✓ Compiled (1520 modules)
- GET /api/suppliers 200 in 558ms
- GET /api/payments 200 in 560ms
- GET /api/opportunities 200 in 562ms
- GET /api/contracts 200 in 565ms
- GET / 200 in 2129ms
- GET /api/opportunities 200 in 343ms
- GET /api/contracts 200 in 401ms
- GET /api/payments 200 in 410ms
- GET /api/suppliers 200 in 418ms
- ✓ Compiled in 1077ms (2650 modules)
- GET / 200 in 112ms
- GET / 200 in 1793ms
- ✓ Compiled /api/contracts in 153ms (1512 modules)
- ✓ Compiled (1520 modules)
- GET /api/payments 200 in 427ms
- GET /api/suppliers 200 in 429ms
- GET /api/opportunities 200 in 434ms
- GET /api/contracts 200 in 437ms
- GET / 200 in 2477ms
- GET /api/opportunities 200 in 256ms
- GET /api/payments 200 in 320ms
- GET /api/contracts 200 in 326ms
- GET /api/suppliers 200 in 332ms
- ✓ Compiled in 3.2s (2650 modules)
- GET / 200 in 1311ms
- GET / 200 in 1502ms
- ○ Compiling /api/suppliers ...
- ✓ Compiled /api/suppliers in 1067ms (1512 modules)
- ✓ Compiled (1520 modules)
- GET /api/payments 200 in 2700ms
- GET /api/suppliers 200 in 2746ms
- GET /api/opportunities 200 in 2759ms
- GET /api/contracts 200 in 2768ms
- ✓ Compiled in 262ms (2758 modules)
- GET / 200 in 88ms
- GET / 200 in 89ms
- GET / 200 in 1826ms
- GET /api/opportunities 200 in 336ms
- GET /api/payments 200 in 374ms
- GET /api/suppliers 200 in 378ms
- GET /api/contracts 200 in 396ms
- GET / 200 in 545ms
- GET /api/opportunities 200 in 145ms
- GET /api/contracts 200 in 165ms
- GET /api/payments 200 in 169ms
- GET /api/suppliers 200 in 173ms
- ✓ Compiled in 5.1s (2636 modules)
- ○ Compiling /api/contracts ...
- ✓ Compiled /api/contracts in 853ms (1514 modules)
- ✓ Compiled (1520 modules)
- GET /api/payments 200 in 2597ms
- GET /api/contracts 200 in 2610ms
- GET /api/opportunities 200 in 2615ms
- GET /api/suppliers 200 in 2629ms
- GET / 200 in 4429ms
- GET /api/opportunities 200 in 24ms
- GET /api/payments 200 in 39ms
- GET /api/suppliers 200 in 41ms
- GET /api/contracts 200 in 43ms
- ✓ Compiled in 505ms (2650 modules)
- GET / 200 in 114ms
- GET / 200 in 322ms
- ✓ Compiled /api/suppliers in 126ms (1512 modules)
- ✓ Compiled (1520 modules)
- GET /api/payments 200 in 407ms
- GET /api/contracts 200 in 409ms
- GET /api/suppliers 200 in 411ms
- GET /api/opportunities 200 in 413ms
- ✓ Compiled in 351ms (2758 modules)
- GET / 200 in 94ms
- GET / 200 in 95ms
- GET / 200 in 244ms
- GET /api/opportunities 200 in 67ms
- GET /api/payments 200 in 67ms
- GET /api/contracts 200 in 69ms
- GET /api/suppliers 200 in 70ms
- GET / 200 in 645ms
- GET /api/opportunities 200 in 89ms
- GET /api/payments 200 in 90ms
- GET /api/contracts 200 in 93ms
- GET /api/suppliers 200 in 94ms
- GET / 200 in 97ms
- GET /api/contracts 200 in 37ms
- GET /api/suppliers 200 in 39ms
- GET /api/payments 200 in 41ms
- GET /api/opportunities 200 in 44ms
- ✓ Compiled in 583ms (2758 modules)
- GET / 200 in 102ms
- GET / 200 in 105ms
- GET / 200 in 3218ms
- GET /api/opportunities 200 in 76ms
- GET /api/payments 200 in 79ms
- GET /api/suppliers 200 in 80ms
- GET /api/contracts 200 in 81ms
- ✓ Compiled /api/suppliers in 4.8s (2650 modules)
- ✓ Compiled in 1ms (1520 modules)
- GET /api/contracts 200 in 3361ms
- GET /api/suppliers 200 in 3361ms
- GET /api/opportunities 200 in 3368ms
- GET /api/payments 200 in 3365ms
- GET / 200 in 2657ms
- GET / 200 in 412ms
- GET /api/opportunities 200 in 38ms
- GET /api/suppliers 200 in 75ms
- GET /api/contracts 200 in 78ms
- GET /api/payments 200 in 79ms
- ✓ Compiled in 2s (1412 modules)
- ✓ Compiled in 901ms (2652 modules)
- GET / 200 in 126ms
- ✓ Compiled /api/suppliers in 273ms (1516 modules)
- ✓ Compiled in 0ms (1524 modules)
- ✓ Compiled in 0ms (1524 modules)
- ✓ Compiled in 0ms (1524 modules)
- GET /api/opportunities 200 in 761ms
- GET /api/contracts 200 in 955ms
- GET /api/suppliers 200 in 955ms
- GET /api/payments 200 in 957ms
- GET / 200 in 672ms
- GET / 200 in 22ms
- ✓ Compiled /api/auth/login in 212ms (1527 modules)
- POST /api/auth/login 200 in 363ms
- GET / 200 in 78ms
- POST /api/opportunities 201 in 31ms
- POST /api/suppliers 201 in 33ms
- GET /api/contracts 200 in 18ms
- GET /api/payments 200 in 13ms
- DELETE /api/contracts 200 in 34ms
- DELETE /api/payments 200 in 24ms
- DELETE /api/opportunities 200 in 30ms
- DELETE /api/suppliers 200 in 22ms
- GET /api/opportunities 200 in 16ms
- GET /api/suppliers 200 in 14ms
- GET /api/contracts 200 in 13ms
- GET /api/payments 200 in 15ms
- GET / 200 in 333ms
- GET /api/opportunities 200 in 33ms
- GET /api/contracts 200 in 35ms
- GET /api/payments 200 in 35ms
- GET /api/suppliers 200 in 38ms
- POST /api/auth/login 200 in 45ms
- GET /api/opportunities 200 in 14ms
- GET /api/suppliers 200 in 18ms
- POST /api/contracts 201 in 18ms
- POST /api/payments 201 in 29ms
- POST /api/contracts 201 in 27ms
- POST /api/payments 201 in 29ms
- GET /api/contracts 200 in 28ms
- GET /api/payments 200 in 13ms
- GET / 200 in 70ms
- GET /api/opportunities 200 in 33ms
- GET /api/contracts 200 in 35ms
- GET /api/suppliers 200 in 36ms
- GET /api/payments 200 in 38ms
- POST /api/auth/login 200 in 41ms
- POST /api/opportunities 201 in 39ms
- POST /api/suppliers 201 in 25ms
- POST /api/contracts 201 in 24ms
- POST /api/payments 201 in 33ms
- DELETE /api/contracts 200 in 22ms
- DELETE /api/payments 200 in 19ms
- DELETE /api/opportunities 200 in 35ms
- DELETE /api/suppliers 200 in 30ms
- GET / 200 in 775ms
- GET /api/opportunities 200 in 164ms
- GET /api/payments 200 in 172ms
- GET /api/suppliers 200 in 176ms
- GET /api/contracts 200 in 181ms
- ✓ Compiled in 620ms (2652 modules)
- GET / 200 in 109ms
- ✓ Compiled /api/contracts in 275ms (1516 modules)
- ✓ Compiled (1524 modules)
- GET /api/suppliers 200 in 573ms
- GET /api/payments 200 in 574ms
- GET /api/opportunities 200 in 594ms
- GET /api/contracts 200 in 597ms
- GET / 200 in 336ms
- GET /api/opportunities 200 in 36ms
- GET /api/contracts 200 in 75ms
- GET /api/suppliers 200 in 76ms
- GET /api/payments 200 in 77ms
- ✓ Compiled in 329ms (2763 modules)
- GET / 200 in 75ms
- GET / 200 in 75ms
- GET / 200 in 192ms
- GET /api/suppliers 200 in 50ms
- GET /api/payments 200 in 88ms
- GET /api/opportunities 200 in 90ms
- GET /api/contracts 200 in 92ms
- GET / 200 in 975ms
- GET /api/opportunities 200 in 32ms
- GET /api/contracts 200 in 34ms
- GET /api/payments 200 in 35ms
- GET /api/suppliers 200 in 36ms
- GET / 307 in 44ms
- GET /login 200 in 77ms
- ✓ Compiled /api/auth/login in 385ms (1514 modules)
- POST /api/auth/login 200 in 478ms
- GET / 200 in 35ms
- GET / 200 in 23ms
- ✓ Compiled /api/suppliers in 124ms (1519 modules)
- ✓ Compiled (1527 modules)
- GET /api/payments 200 in 312ms
- GET /api/contracts 200 in 314ms
- GET /api/suppliers 200 in 314ms
- GET /api/opportunities 200 in 316ms
- ✓ Compiled in 185ms (1225 modules)
- ✓ Compiled in 1226ms (2765 modules)
- GET / 200 in 144ms
- GET / 200 in 145ms
- GET / 200 in 334ms
- GET /api/opportunities 200 in 79ms
- GET /api/suppliers 200 in 95ms
- GET /api/contracts 200 in 97ms
- GET /api/payments 200 in 98ms
- GET / 200 in 716ms
- GET /api/opportunities 200 in 200ms
- GET /api/contracts 200 in 245ms
- GET /api/payments 200 in 254ms
- GET /api/suppliers 200 in 262ms
- ✓ Compiled in 604ms (2762 modules)
- GET /api/contracts 200 in 104ms
- GET /api/payments 200 in 108ms
- GET /api/opportunities 200 in 109ms
- GET /api/suppliers 200 in 110ms
- GET / 200 in 408ms
- GET /api/opportunities 200 in 27ms
- GET /api/payments 200 in 74ms
- GET /api/suppliers 200 in 76ms
- GET /api/contracts 200 in 77ms
- ✓ Compiled in 539ms (2651 modules)
- ✓ Compiled /api/contracts in 153ms (1527 modules)
- ✓ Compiled (1535 modules)
- GET /api/payments 200 in 472ms
- GET /api/opportunities 200 in 474ms
- GET /api/opportunities 200 in 451ms
- GET /api/contracts 200 in 476ms
- GET /api/payments 200 in 452ms
- GET /api/contracts 200 in 453ms
- GET /api/suppliers 200 in 478ms
- GET /api/suppliers 200 in 455ms
- GET / 200 in 269ms
- GET /api/opportunities 200 in 59ms
- GET /api/payments 200 in 82ms
- GET /api/suppliers 200 in 83ms
- GET /api/contracts 200 in 85ms
- GET / 200 in 1485ms
- GET /api/opportunities 200 in 432ms
- GET /api/contracts 200 in 467ms
- GET /api/payments 200 in 471ms
- GET /api/suppliers 200 in 480ms
- POST /api/opportunities 201 in 95ms
- GET /api/opportunities 200 in 243ms
- GET /api/contracts 200 in 243ms
- GET /api/payments 200 in 247ms
- GET /api/suppliers 200 in 251ms
- ✓ Compiled in 890ms (2665 modules)
- ✓ Compiled /api/suppliers in 300ms (1527 modules)
- ✓ Compiled (1535 modules)
- GET /api/payments 200 in 626ms
- GET /api/contracts 200 in 628ms
- GET /api/suppliers 200 in 629ms
- GET /api/opportunities 200 in 630ms
- GET / 200 in 1181ms
- GET / 200 in 28ms
- GET / 200 in 23ms
- GET / 200 in 21ms
- ✓ Compiled /api/auth/login in 240ms (1538 modules)
- POST /api/auth/login 200 in 383ms
- GET / 200 in 92ms
- POST /api/opportunities 201 in 34ms
- GET / 200 in 342ms
- GET /api/opportunities 200 in 32ms
- GET /api/payments 200 in 69ms
- GET /api/contracts 200 in 85ms
- GET /api/suppliers 200 in 87ms
- POST /api/auth/login 200 in 49ms
- DELETE /api/opportunities 200 in 24ms
- ✓ Compiled /api/suppliers in 758ms (2771 modules)
- ✓ Compiled in 1ms (1538 modules)
- ✓ Compiled in 0ms (1538 modules)
- ✓ Compiled in 1ms (1538 modules)
- GET /api/opportunities 200 in 802ms
- GET /api/opportunities 200 in 804ms
- GET /api/payments 200 in 1104ms
- GET /api/suppliers 200 in 1137ms
- GET /api/contracts 200 in 1138ms
- GET /api/payments 200 in 1139ms
- GET /api/suppliers 200 in 1143ms
- GET /api/contracts 200 in 1146ms
- GET / 200 in 840ms
- GET / 200 in 839ms
- GET / 200 in 331ms
- GET /api/opportunities 200 in 41ms
- GET /api/contracts 200 in 79ms
- GET /api/suppliers 200 in 80ms
- GET /api/payments 200 in 81ms
- ✓ Compiled in 583ms (2762 modules)
- GET /api/opportunities 200 in 113ms
- GET /api/opportunities 200 in 111ms
- GET /api/payments 200 in 114ms
- GET /api/payments 200 in 113ms
- GET /api/contracts 200 in 117ms
- GET /api/contracts 200 in 114ms
- GET /api/suppliers 200 in 118ms
- GET /api/suppliers 200 in 121ms
- GET /api/payments 200 in 29ms
- GET /api/suppliers 200 in 32ms
- GET /api/opportunities 200 in 39ms
- GET /api/contracts 200 in 40ms
- GET / 200 in 226ms
- GET /api/opportunities 200 in 33ms
- GET /api/suppliers 200 in 69ms
- GET /api/payments 200 in 71ms
- GET /api/contracts 200 in 72ms
- GET / 200 in 854ms
- GET /api/opportunities 200 in 179ms
- GET /api/contracts 200 in 185ms
- GET /api/suppliers 200 in 195ms
- GET /api/payments 200 in 205ms
+ ✓ Compiled /api/suppliers in 1436ms (2766 modules)
+ GET /api/payments 200 in 1582ms
+ GET /api/contracts 200 in 1600ms
+ GET /api/suppliers 200 in 1604ms
+ GET /api/files/cmsh7bqlc0009v1uwifswnb20 200 in 55ms
+ GET /api/contracts 200 in 149ms
+ GET /api/payments 200 in 160ms
+ GET / 200 in 3841ms
+ GET /api/opportunities 200 in 220ms
+ GET /api/contracts 200 in 289ms
+ GET /api/payments 200 in 295ms
+ GET /api/suppliers 200 in 301ms
  ○ Compiling /api/files ...
- ✓ Compiled /api/files in 4.6s (2764 modules)
- POST /api/files 201 in 4979ms
- ○ Compiling /api/opportunities/[id]/attachments ...
- ✓ Compiled /api/opportunities/[id]/attachments in 1629ms (2766 modules)
- POST /api/opportunities/cmsh039e2002nv1rc6bx1uhah/attachments 200 in 3105ms
- GET /api/opportunities 200 in 121ms
- ✓ Compiled /api/suppliers in 596ms (2651 modules)
- ✓ Compiled (2762 modules)
- GET /api/contracts 200 in 690ms
- GET /api/opportunities 200 in 693ms
- GET /api/suppliers 200 in 685ms
- GET /api/payments 200 in 699ms
- GET / 200 in 365ms
- GET /api/suppliers 200 in 37ms
- GET /api/opportunities 200 in 78ms
- GET /api/contracts 200 in 79ms
- GET /api/payments 200 in 79ms
- GET / 200 in 181ms
- GET /api/opportunities 200 in 172ms
- GET /api/contracts 200 in 182ms
- GET /api/payments 200 in 187ms
- GET /api/suppliers 200 in 197ms
+ ✓ Compiled /api/files in 2.2s (2763 modules)
+ POST /api/files 201 in 2564ms
+ POST /api/files 201 in 432ms
+ ○ Compiling /api/contracts/[id]/attachments ...
+ ✓ Compiled /api/contracts/[id]/attachments in 1279ms (2765 modules)
+ POST /api/files 201 in 101ms
+ POST /api/contracts/cmsgzjaqh001wv1rcvja2761j/attachments 200 in 2236ms
+ POST /api/contracts/cmsgzjaor001sv1rc2adgefss/attachments 200 in 427ms
+ POST /api/contracts/cmsh039e9002pv1rcyq7z7j61/attachments 200 in 2247ms
+ GET /api/contracts 200 in 86ms
+ GET /api/contracts 200 in 56ms
+ GET /api/contracts 200 in 57ms
+ ○ Compiling /api/files/[id] ...
+ ✓ Compiled /api/files/[id] in 4s (1539 modules)
+ GET /api/files/cmsh8i9rb0003v16sncpyci4q 200 in 4238ms
+ GET /api/files/cmsh8i9ra0001v16sk2a4v1jh 200 in 109ms
+ POST /api/files 201 in 187ms
+ POST /api/contracts/cmsh039e9002pv1rcyq7z7j61/attachments 200 in 332ms
+ GET /api/contracts 200 in 93ms
+ GET /api/files/cmsh8i9rb0003v16sncpyci4q 200 in 93ms
+ ○ Compiling /api/auth/logout ...
+ ✓ Compiled /api/auth/logout in 2.3s (2754 modules)
+ POST /api/auth/logout 200 in 2634ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 5.9s (2769 modules)
+ POST /api/auth/logout 200 in 3274ms
+ POST /api/auth/logout 200 in 3272ms
+ POST /api/auth/logout 200 in 3135ms
+ POST /api/auth/logout 200 in 2968ms
+ POST /api/auth/logout 200 in 4133ms
+ GET /login 200 in 6848ms
+ POST /api/auth/logout 200 in 450ms
+ GET /login 200 in 1352ms
+ GET / 307 in 1699ms
+ GET /login 200 in 123ms
+ GET /login 200 in 136ms
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 1730ms (1534 modules)
+ POST /api/auth/login 200 in 2337ms
+ GET / 200 in 301ms
+ GET / 200 in 229ms
+ ○ Compiling /api/payments ...
+ ✓ Compiled /api/payments in 1017ms (1539 modules)
+ ✓ Compiled (1547 modules)
+ GET /api/payments 200 in 3473ms
+ GET /api/suppliers 200 in 3479ms
+ GET /api/opportunities 200 in 3493ms
+ GET /api/contracts 200 in 3499ms
+ ○ Compiling /api/files/[id] ...
+ ✓ Compiled /api/files/[id] in 1270ms (1549 modules)
+ GET /api/files/cmsh7bqlc0009v1uwifswnb20 200 in 1623ms

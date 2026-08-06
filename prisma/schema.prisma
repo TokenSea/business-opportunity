@@ -24,16 +24,16 @@ enum PartyType {
 }
 
 model User {
-  id           String     @id @default(cuid())
-  username     String     @unique @db.VarChar(64)
-  passwordHash String     @db.VarChar(255)
-  role         UserRole   @default(USER)
-  enabled      Boolean    @default(true)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id            String        @id @default(cuid())
+  username      String        @unique @db.VarChar(64)
+  passwordHash  String        @db.VarChar(255)
+  role          UserRole      @default(USER)
+  enabled       Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
   opportunities Opportunity[]
-  attachments  Attachment[]
-  auditLogs    AuditLog[]
+  attachments   Attachment[]
+  auditLogs     AuditLog[]
 }
 
 model Opportunity {
@@ -83,6 +83,7 @@ model Contract {
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   supplier      Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   recordFile    Attachment?  @relation("ContractRecord", fields: [recordFileId], references: [id], onDelete: SetNull)
+  attachments   Attachment[] @relation("ContractAttachments")
 
   @@index([type])
   @@index([opportunityId])
@@ -101,6 +102,7 @@ model Payment {
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   supplier      Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
   recordFile    Attachment?  @relation("PaymentRecord", fields: [recordFileId], references: [id], onDelete: SetNull)
+  attachments   Attachment[] @relation("PaymentAttachments")
 
   @@index([type])
   @@index([opportunityId])
@@ -116,13 +118,19 @@ model Attachment {
   fileSize       Int
   uploadedById   String
   opportunityId  String?
+  contractId     String?
+  paymentId      String?
   createdAt      DateTime     @default(now())
   uploadedBy     User         @relation(fields: [uploadedById], references: [id])
   opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contract       Contract?    @relation("ContractAttachments", fields: [contractId], references: [id], onDelete: Cascade)
+  payment        Payment?     @relation("PaymentAttachments", fields: [paymentId], references: [id], onDelete: Cascade)
   contractRecord Contract?    @relation("ContractRecord")
   paymentRecord  Payment?     @relation("PaymentRecord")
 
   @@index([opportunityId])
+  @@index([contractId])
+  @@index([paymentId])
 }
 
 model AuditLog {

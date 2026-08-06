@@ -32,6 +32,7 @@ export const linkedRecordSchema = z.object({
   type: z.enum(["CUSTOMER", "SUPPLIER"]),
   targetId: z.string().min(1),
   recordFileId: z.string().nullable().optional(),
+  attachmentIds: z.array(z.string().min(1)).max(20).optional().default([]),
 });
 
 export const linkedRecordFileSchema = z.object({

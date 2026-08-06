@@ -2,7 +2,7 @@ export type UserRole = "ADMIN" | "USER";
 export type OpportunityStatus = "NOT_STARTED" | "IN_PROGRESS" | "FINISHED";
 export type PartyType = "CUSTOMER" | "SUPPLIER";
 
-export type AttachmentRef = { id: string; originalName: string };
+export type AttachmentRef = { id: string; originalName: string; mimeType: string };
 
 export type Opportunity = {
   id: string;
@@ -35,5 +35,6 @@ export type LinkedRecord = {
   opportunityId: string | null;
   supplierId: string | null;
   recordFile: AttachmentRef | null;
+  attachments: AttachmentRef[];
   createdAt: string;
 };

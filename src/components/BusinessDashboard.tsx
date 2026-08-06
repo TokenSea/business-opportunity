@@ -4,6 +4,9 @@ import {
   Bell,
   BriefcaseBusiness,
   CircleHelp,
+  Download,
+  Eye,
+  FileText,
   FileSignature,
   Landmark,
   LogOut,
@@ -19,10 +22,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   App,
   Button,
+  Empty,
   Form,
   Input,
   Modal,
   Pagination,
+  Popover,
   Select,
   Table,
   Tag,
@@ -34,12 +39,15 @@ import {
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type Key } from "react";
 import type { SessionUser } from "@/lib/auth";
-import type { LinkedRecord, Opportunity, OpportunityStatus, PartyType, Supplier } from "@/types/business";
+import type { AttachmentRef, LinkedRecord, Opportunity, OpportunityStatus, PartyType, Supplier } from "@/types/business";
 
 type PageKey = "opportunities" | "contracts" | "payments" | "suppliers";
 type OpportunityForm = Omit<Opportunity, "id" | "attachments" | "createdAt" | "updatedAt">;
 type SupplierForm = { name: string; account: string; password: string; notes?: string };
 type LinkedForm = { type: PartyType; targetId: string; record?: UploadFile[] };
+type EditableOpportunityField = "customer" | "requirement" | "source" | "paymentTerms" | "progress" | "notes";
+type EditableSupplierField = "name" | "account" | "password" | "notes";
+type AttachmentKind = "opportunities" | "contracts" | "payments";
 const PAGE_SIZE = 8;
 
 const pageInfo: Record<PageKey, { title: string; subtitle: string }> = {
@@ -81,19 +89,145 @@ async function uploadFile(file?: UploadFile | File) {
   return requestJson<{ id: string; originalName: string }>("/api/files", { method: "POST", body: form });
 }
 
-function RecordLink({ record, empty }: { record: LinkedRecord["recordFile"]; empty: string }) {
-  if (!record) return <span className="muted-record">{empty}</span>;
-  return <Tooltip title={record.originalName} mouseEnterDelay={0.4}>
-    <a className="record-link" href={`/api/files/${record.id}`}><Paperclip size={14} /><span>{record.originalName}</span></a>
-  </Tooltip>;
-}
-
 function CellText({ value, lines = 1 }: { value?: string | null; lines?: 1 | 2 }) {
   const text = value?.trim();
   if (!text) return <span className="cell-empty">—</span>;
   return <Tooltip title={text} mouseEnterDelay={0.4}>
     <span className={lines === 1 ? "cell-text cell-single-line" : "cell-text cell-multi-line"}>{text}</span>
   </Tooltip>;
+}
+
+function EditableTextCell({
+  value,
+  lines = 1,
+  editable,
+  label,
+  onSave,
+}: {
+  value?: string | null;
+  lines?: 1 | 2;
+  editable: boolean;
+  label: string;
+  onSave: (value: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+  if (!editable) return <CellText value={value} lines={lines} />;
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(draft.trim());
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Popover
+    open={open}
+    onOpenChange={(next) => {
+      if (next) setDraft(value || "");
+      setOpen(next);
+    }}
+    trigger="click"
+    placement="bottom"
+    content={<div className="inline-editor">
+      <strong>修改{label}</strong>
+      {lines === 2
+        ? <Input.TextArea value={draft} onChange={(event) => setDraft(event.target.value)} autoSize={{ minRows: 3, maxRows: 6 }} autoFocus />
+        : <Input value={draft} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />}
+      <div className="inline-editor-actions"><Button size="small" onClick={() => setOpen(false)}>取消</Button><Button size="small" type="primary" loading={saving} onClick={() => void save()}>保存</Button></div>
+    </div>}
+  >
+    <button type="button" className="editable-cell-button" aria-label={`修改${label}`}><CellText value={value} lines={lines} /></button>
+  </Popover>;
+}
+
+function EditablePasswordCell({ editable, onSave }: { editable: boolean; onSave: (value: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const masked = <span className="masked-password">••••••••</span>;
+  if (!editable) return masked;
+
+  async function save() {
+    if (!draft) return;
+    setSaving(true);
+    try {
+      await onSave(draft);
+      setOpen(false);
+      setDraft("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Popover
+    open={open}
+    onOpenChange={(next) => {
+      if (next) setDraft("");
+      setOpen(next);
+    }}
+    trigger="click"
+    placement="bottom"
+    content={<div className="inline-editor">
+      <strong>修改密码</strong>
+      <Input.Password value={draft} placeholder="请输入新密码" onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
+      <div className="inline-editor-actions"><Button size="small" onClick={() => setOpen(false)}>取消</Button><Button size="small" type="primary" disabled={!draft} loading={saving} onClick={() => void save()}>保存</Button></div>
+    </div>}
+  >
+    <button type="button" className="editable-cell-button" aria-label="修改密码">{masked}</button>
+  </Popover>;
+}
+
+function EditableStatusCell({
+  value,
+  editable,
+  onSave,
+}: {
+  value: OpportunityStatus;
+  editable: boolean;
+  onSave: (value: OpportunityStatus) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const tag = <Tag className={`status-tag status-${value.toLowerCase()}`}>{statusText[value]}</Tag>;
+  if (!editable) return tag;
+
+  async function choose(next: OpportunityStatus) {
+    if (next === value) {
+      setOpen(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(next);
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return <Popover
+    open={open}
+    onOpenChange={setOpen}
+    trigger="click"
+    placement="bottom"
+    content={<div className="status-editor">
+      <strong>选择状态</strong>
+      <div className="status-editor-options">{Object.entries(statusText).map(([key, label]) => <button
+        type="button"
+        key={key}
+        className={key === value ? "selected" : ""}
+        disabled={saving}
+        onClick={() => void choose(key as OpportunityStatus)}
+      ><Tag className={`status-tag status-${key.toLowerCase()}`}>{label}</Tag></button>)}</div>
+    </div>}
+  >
+    <button type="button" className="editable-status-button" aria-label="修改状态" onClick={() => setOpen(true)}>{tag}</button>
+  </Popover>;
 }
 
 export function BusinessDashboard({ user }: { user: SessionUser }) {
@@ -123,8 +257,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const [opportunityOpen, setOpportunityOpen] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [linkedOpen, setLinkedOpen] = useState<"contracts" | "payments" | null>(null);
-  const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
-  const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
+  const [attachmentTarget, setAttachmentTarget] = useState<{ kind: AttachmentKind; id: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<AttachmentRef | null>(null);
   const [opportunityFiles, setOpportunityFiles] = useState<UploadFile[]>([]);
   const [linkedType, setLinkedType] = useState<PartyType>("CUSTOMER");
   const [opportunityForm] = Form.useForm<OpportunityForm>();
@@ -143,6 +277,16 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const contracts = contractsQuery.data || [];
   const payments = paymentsQuery.data || [];
   const suppliers = suppliersQuery.data || [];
+  const managedAttachmentRecord = attachmentTarget
+    ? attachmentTarget.kind === "opportunities"
+      ? opportunities.find((item) => item.id === attachmentTarget.id)
+      : attachmentTarget.kind === "contracts"
+        ? contracts.find((item) => item.id === attachmentTarget.id)
+        : payments.find((item) => item.id === attachmentTarget.id)
+    : null;
+  const managedAttachmentName = managedAttachmentRecord
+    ? "customer" in managedAttachmentRecord ? managedAttachmentRecord.customer : managedAttachmentRecord.name
+    : "";
 
   const invalidateBusiness = async () => {
     await Promise.all([
@@ -157,16 +301,15 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     mutationFn: async (values: OpportunityForm) => {
       const uploaded = await Promise.all(opportunityFiles.map(uploadFile));
       const body = { ...values, attachmentIds: uploaded.filter(Boolean).map((file) => file!.id) };
-      return requestJson(editingOpportunity ? `/api/opportunities/${editingOpportunity.id}` : "/api/opportunities", {
-        method: editingOpportunity ? "PATCH" : "POST",
+      return requestJson("/api/opportunities", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
     },
     onSuccess: async () => {
-      message.success(editingOpportunity ? "商机已更新" : "商机已新增，合同和付款已同步生成");
+      message.success("商机已新增，合同和付款已同步生成");
       setOpportunityOpen(false);
-      setEditingOpportunity(null);
       setOpportunityFiles([]);
       await invalidateBusiness();
     },
@@ -174,15 +317,15 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   });
 
   const supplierMutation = useMutation({
-    mutationFn: (values: SupplierForm) => requestJson(editingSupplier ? `/api/suppliers/${editingSupplier.id}` : "/api/suppliers", {
-      method: editingSupplier ? "PATCH" : "POST",
+    mutationFn: (values: SupplierForm) => requestJson("/api/suppliers", {
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(values),
     }),
     onSuccess: async () => {
-      message.success(editingSupplier ? "供应商已更新" : "供应商已新增，合同和付款已同步生成");
+      message.success("供应商已新增，合同和付款已同步生成");
       setSupplierOpen(false);
-      setEditingSupplier(null);
+      supplierForm.resetFields();
       await invalidateBusiness();
     },
     onError: (error) => message.error(error.message),
@@ -192,7 +335,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     mutationFn: async (values: LinkedForm) => {
       const entities = values.type === "CUSTOMER" ? opportunities : suppliers;
       const entity = entities.find((item) => item.id === values.targetId);
-      const recordFile = await uploadFile(values.record?.[0]);
+      const uploaded = await Promise.all((values.record || []).map(uploadFile));
       return requestJson(linkedOpen === "contracts" ? "/api/contracts" : "/api/payments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -200,48 +343,83 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           name: entity ? ("customer" in entity ? entity.customer : entity.name) : "",
           type: values.type,
           targetId: values.targetId,
-          recordFileId: recordFile?.id || null,
+          attachmentIds: uploaded.filter(Boolean).map((file) => file!.id),
         }),
       });
     },
     onSuccess: async () => {
       message.success(linkedOpen === "contracts" ? "合同已新增" : "付款已新增");
       setLinkedOpen(null);
+      linkedForm.resetFields();
       await invalidateBusiness();
     },
     onError: (error) => message.error(error.message),
   });
 
-  const recordMutation = useMutation({
-    mutationFn: async ({ kind, rowId, file }: { kind: "contracts" | "payments"; rowId: string; file: File }) => {
-      const recordFile = await uploadFile(file);
-      if (!recordFile) throw new Error("请选择文件");
-      return requestJson(`/api/${kind}/${rowId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recordFileId: recordFile.id }),
-      });
-    },
-    onSuccess: async (_, variables) => {
-      message.success(variables.kind === "contracts" ? "合同记录已保存" : "付款记录已保存");
-      await queryClient.invalidateQueries({ queryKey: [variables.kind] });
-    },
-    onError: (error) => message.error(error.message),
-  });
-
   const attachmentMutation = useMutation({
-    mutationFn: async ({ opportunityId, file }: { opportunityId: string; file: File }) => {
+    mutationFn: async ({ kind, rowId, file }: { kind: AttachmentKind; rowId: string; file: File }) => {
       const uploaded = await uploadFile(file);
       if (!uploaded) throw new Error("请选择文件");
-      return requestJson<{ attached: number }>(`/api/opportunities/${opportunityId}/attachments`, {
+      return requestJson<{ attached: number }>(`/api/${kind}/${rowId}/attachments`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ attachmentIds: [uploaded.id] }),
       });
     },
-    onSuccess: async () => {
+    onSuccess: async (_, variables) => {
       message.success("附件已上传");
-      await queryClient.invalidateQueries({ queryKey: ["opportunities"] });
+      await queryClient.invalidateQueries({ queryKey: [variables.kind] });
+    },
+    onError: (error) => message.error(error.message),
+  });
+
+  const inlineOpportunityMutation = useMutation({
+    mutationFn: ({ row, field, value }: { row: Opportunity; field: EditableOpportunityField | "status"; value: string }) => requestJson(`/api/opportunities/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: row.customer,
+        requirement: row.requirement || "",
+        source: row.source || "",
+        paymentTerms: row.paymentTerms || "",
+        status: row.status,
+        progress: row.progress || "",
+        notes: row.notes || "",
+        attachmentIds: [],
+        [field]: value,
+      }),
+    }),
+    onSuccess: async () => {
+      message.success("字段已更新");
+      await invalidateBusiness();
+    },
+    onError: (error) => message.error(error.message),
+  });
+
+  const inlineSupplierMutation = useMutation({
+    mutationFn: ({ row, field, value }: { row: Supplier; field: EditableSupplierField; value: string }) => requestJson(`/api/suppliers/${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: row.name,
+        account: row.account,
+        password: "",
+        notes: row.notes || "",
+        [field]: value,
+      }),
+    }),
+    onSuccess: async () => {
+      message.success("字段已更新");
+      await invalidateBusiness();
+    },
+    onError: (error) => message.error(error.message),
+  });
+
+  const deleteAttachmentMutation = useMutation({
+    mutationFn: ({ id }: { id: string; kind: AttachmentKind }) => requestJson(`/api/files/${id}`, { method: "DELETE" }),
+    onSuccess: async (_, variables) => {
+      message.success("附件已删除");
+      await queryClient.invalidateQueries({ queryKey: [variables.kind] });
     },
     onError: (error) => message.error(error.message),
   });
@@ -323,92 +501,83 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     });
   }
 
+  async function saveOpportunityField(row: Opportunity, field: EditableOpportunityField | "status", value: string) {
+    await inlineOpportunityMutation.mutateAsync({ row, field, value });
+  }
+
+  async function saveSupplierField(row: Supplier, field: EditableSupplierField, value: string) {
+    await inlineSupplierMutation.mutateAsync({ row, field, value });
+  }
+
+  function renderAttachmentUpload(kind: AttachmentKind, rowId: string, files: AttachmentRef[]) {
+    const variables = attachmentMutation.variables;
+    const isUploading = attachmentMutation.isPending && variables?.kind === kind && variables.rowId === rowId;
+    return <Tooltip title="点击选择并上传附件" mouseEnterDelay={0.4}>
+      <label className={`attachment-upload-trigger${isUploading ? " is-loading" : ""}`}>
+        <input
+          type="file"
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
+          disabled={isUploading}
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            if (file) attachmentMutation.mutate({ kind, rowId, file });
+            event.currentTarget.value = "";
+          }}
+        />
+        <Paperclip size={14} />
+        <span>{isUploading ? "上传中…" : `${files.length} 个附件`}</span>
+      </label>
+    </Tooltip>;
+  }
+
   const opportunityColumns: TableColumnsType<Opportunity> = [
-    { title: "客户", dataIndex: "customer", width: 160, className: "strong-cell", render: (value) => <CellText value={value} /> },
-    { title: "需求与现状", dataIndex: "requirement", width: 270, render: (value) => <CellText value={value} lines={2} /> },
-    { title: "商机来源", dataIndex: "source", width: 250, render: (value) => <CellText value={value} lines={2} /> },
-    { title: "付款条件", dataIndex: "paymentTerms", width: 170, render: (value) => <CellText value={value} /> },
-    { title: "状态", dataIndex: "status", width: 120, render: (value: OpportunityStatus) => <Tag className={`status-tag status-${value.toLowerCase()}`}>{statusText[value]}</Tag> },
-    { title: "进展", dataIndex: "progress", width: 260, render: (value) => <CellText value={value} lines={2} /> },
-    { title: "备注", dataIndex: "notes", width: 230, render: (value) => <CellText value={value} lines={2} /> },
+    { title: "客户", dataIndex: "customer", width: 160, className: "strong-cell", render: (value, row) => <EditableTextCell value={value} editable={user.role === "ADMIN"} label="客户" onSave={(next) => saveOpportunityField(row, "customer", next)} /> },
+    { title: "需求与现状", dataIndex: "requirement", width: 270, render: (value, row) => <EditableTextCell value={value} lines={2} editable={user.role === "ADMIN"} label="需求与现状" onSave={(next) => saveOpportunityField(row, "requirement", next)} /> },
+    { title: "商机来源", dataIndex: "source", width: 250, render: (value, row) => <EditableTextCell value={value} lines={2} editable={user.role === "ADMIN"} label="商机来源" onSave={(next) => saveOpportunityField(row, "source", next)} /> },
+    { title: "付款条件", dataIndex: "paymentTerms", width: 170, render: (value, row) => <EditableTextCell value={value} editable={user.role === "ADMIN"} label="付款条件" onSave={(next) => saveOpportunityField(row, "paymentTerms", next)} /> },
+    {
+      title: "状态",
+      dataIndex: "status",
+      width: 120,
+      render: (value: OpportunityStatus, row) => <EditableStatusCell value={value} editable={user.role === "ADMIN"} onSave={(next) => saveOpportunityField(row, "status", next)} />,
+    },
+    { title: "进展", dataIndex: "progress", width: 260, render: (value, row) => <EditableTextCell value={value} lines={2} editable={user.role === "ADMIN"} label="进展" onSave={(next) => saveOpportunityField(row, "progress", next)} /> },
+    { title: "备注", dataIndex: "notes", width: 230, render: (value, row) => <EditableTextCell value={value} lines={2} editable={user.role === "ADMIN"} label="备注" onSave={(next) => saveOpportunityField(row, "notes", next)} /> },
     {
       title: "附件",
       dataIndex: "attachments",
       width: 140,
       fixed: "right",
-      render: (files: Opportunity["attachments"], row) => {
-        const isUploading = attachmentMutation.isPending && attachmentMutation.variables?.opportunityId === row.id;
-        return <Tooltip title="点击选择并上传附件" mouseEnterDelay={0.4}>
-          <label className={`attachment-upload-trigger${isUploading ? " is-loading" : ""}`}>
-            <input
-              type="file"
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
-              disabled={isUploading}
-              onChange={(event) => {
-                const file = event.currentTarget.files?.[0];
-                if (file) attachmentMutation.mutate({ opportunityId: row.id, file });
-                event.currentTarget.value = "";
-              }}
-            />
-            <Paperclip size={14} />
-            <span>{isUploading ? "上传中…" : `${files.length} 个附件`}</span>
-          </label>
-        </Tooltip>;
-      },
+      render: (files: Opportunity["attachments"], row) => renderAttachmentUpload("opportunities", row.id, files),
     },
-    { title: "操作", width: 90, fixed: "right", render: (_, row) => <Button type="link" size="small" onClick={() => openOpportunityEdit(row)}>编辑</Button> },
+    { title: "操作", width: 110, fixed: "right", render: (_, row) => <Button type="link" size="small" icon={<Paperclip size={14} />} onClick={() => setAttachmentTarget({ kind: "opportunities", id: row.id })}>附件管理</Button> },
   ];
 
-  const linkedColumns = (kind: "contracts" | "payments", empty: string): TableColumnsType<LinkedRecord> => [
+  const linkedColumns = (kind: "contracts" | "payments"): TableColumnsType<LinkedRecord> => [
     { title: "名称", dataIndex: "name", width: "32%", className: "strong-cell", render: (value) => <CellText value={value} /> },
-    { title: "类型", dataIndex: "type", width: "35%", render: (value: PartyType) => <Tag className={`party-tag ${value === "CUSTOMER" ? "party-customer" : "party-supplier"}`}>{value === "CUSTOMER" ? "客户" : "供应商"}</Tag> },
+    { title: "类型", dataIndex: "type", width: "22%", render: (value: PartyType) => <Tag className={`party-tag ${value === "CUSTOMER" ? "party-customer" : "party-supplier"}`}>{value === "CUSTOMER" ? "客户" : "供应商"}</Tag> },
     {
       title: kind === "contracts" ? "合同记录" : "付款记录",
-      dataIndex: "recordFile",
-      width: "33%",
-      render: (value, row) => <div className="record-cell">
-        <RecordLink record={value} empty={empty} />
-        <Upload
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
-          showUploadList={false}
-          beforeUpload={(file) => {
-            recordMutation.mutate({ kind, rowId: row.id, file });
-            return false;
-          }}
-        >
-          <Button type="link" size="small" loading={recordMutation.isPending}>{value ? "更换" : "上传记录"}</Button>
-        </Upload>
-      </div>,
+      dataIndex: "attachments",
+      width: "24%",
+      render: (files: LinkedRecord["attachments"], row) => renderAttachmentUpload(kind, row.id, files),
     },
+    { title: "操作", width: "22%", render: (_, row) => <Button type="link" size="small" icon={<Paperclip size={14} />} onClick={() => setAttachmentTarget({ kind, id: row.id })}>附件管理</Button> },
   ];
 
   const supplierColumns: TableColumnsType<Supplier> = [
-    { title: "名称", dataIndex: "name", width: "25%", className: "strong-cell", render: (value) => <CellText value={value} /> },
-    { title: "账号", dataIndex: "account", width: "25%", render: (value) => <CellText value={value} /> },
-    { title: "密码", dataIndex: "password", width: "20%", render: () => <span className="masked-password">••••••••</span> },
-    { title: "备注", dataIndex: "notes", width: "25%", render: (value) => <CellText value={value} lines={2} /> },
-    { title: "操作", width: "5%", render: (_, row) => <Button type="link" size="small" onClick={() => openSupplierEdit(row)}>编辑</Button> },
+    { title: "名称", dataIndex: "name", width: "25%", className: "strong-cell", render: (value, row) => <EditableTextCell value={value} editable={user.role === "ADMIN"} label="名称" onSave={(next) => saveSupplierField(row, "name", next)} /> },
+    { title: "账号", dataIndex: "account", width: "25%", render: (value, row) => <EditableTextCell value={value} editable={user.role === "ADMIN"} label="账号" onSave={(next) => saveSupplierField(row, "account", next)} /> },
+    { title: "密码", dataIndex: "password", width: "20%", render: (_, row) => <EditablePasswordCell editable={user.role === "ADMIN"} onSave={(next) => saveSupplierField(row, "password", next)} /> },
+    { title: "备注", dataIndex: "notes", width: "30%", render: (value, row) => <EditableTextCell value={value} lines={2} editable={user.role === "ADMIN"} label="备注" onSave={(next) => saveSupplierField(row, "notes", next)} /> },
   ];
 
   function openOpportunityCreate() {
-    setEditingOpportunity(null);
-    setOpportunityFiles([]);
-    setOpportunityOpen(true);
-  }
-
-  function openOpportunityEdit(row: Opportunity) {
-    setEditingOpportunity(row);
     setOpportunityFiles([]);
     setOpportunityOpen(true);
   }
 
   function openSupplierCreate() {
-    setEditingSupplier(null);
-    setSupplierOpen(true);
-  }
-
-  function openSupplierEdit(row: Supplier) {
-    setEditingSupplier(row);
     setSupplierOpen(true);
   }
 
@@ -466,13 +635,13 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
 
               {page === "contracts" && <>
                 <div className="table-toolbar"><Button type="primary" icon={<Plus size={16} />} onClick={() => openLinked("contracts")}>新建合同</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.contracts.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "contracts"} onClick={() => confirmDelete("contracts")}>删除合同{selectedIds.contracts.length ? ` (${selectedIds.contracts.length})` : ""}</Button><div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称或类型" value={keywords.contracts} onChange={(event) => changeKeyword("contracts", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("contracts", "")}>重置</Button></div>
-                <div className="table-holder"><Table className="linked-table" rowKey="id" rowSelection={rowSelectionFor("contracts")} columns={linkedColumns("contracts", "暂无合同记录")} dataSource={pagedContracts} loading={contractsQuery.isLoading} pagination={false} tableLayout="fixed" /></div>
+                <div className="table-holder"><Table className="linked-table" rowKey="id" rowSelection={rowSelectionFor("contracts")} columns={linkedColumns("contracts")} dataSource={pagedContracts} loading={contractsQuery.isLoading} pagination={false} tableLayout="fixed" /></div>
                 <div className="table-footer"><span>共 {filteredContracts.length} 条</span><Pagination current={pageNumbers.contracts} total={filteredContracts.length} pageSize={PAGE_SIZE} showSizeChanger={false} onChange={(current) => changePage("contracts", current)} /></div>
               </>}
 
               {page === "payments" && <>
                 <div className="table-toolbar"><Button type="primary" icon={<Plus size={16} />} onClick={() => openLinked("payments")}>新建付款</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.payments.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "payments"} onClick={() => confirmDelete("payments")}>删除付款{selectedIds.payments.length ? ` (${selectedIds.payments.length})` : ""}</Button><div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称或类型" value={keywords.payments} onChange={(event) => changeKeyword("payments", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("payments", "")}>重置</Button></div>
-                <div className="table-holder"><Table className="linked-table" rowKey="id" rowSelection={rowSelectionFor("payments")} columns={linkedColumns("payments", "暂无付款记录")} dataSource={pagedPayments} loading={paymentsQuery.isLoading} pagination={false} tableLayout="fixed" /></div>
+                <div className="table-holder"><Table className="linked-table" rowKey="id" rowSelection={rowSelectionFor("payments")} columns={linkedColumns("payments")} dataSource={pagedPayments} loading={paymentsQuery.isLoading} pagination={false} tableLayout="fixed" /></div>
                 <div className="table-footer"><span>共 {filteredPayments.length} 条</span><Pagination current={pageNumbers.payments} total={filteredPayments.length} pageSize={PAGE_SIZE} showSizeChanger={false} onChange={(current) => changePage("payments", current)} /></div>
               </>}
 
@@ -486,21 +655,13 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         </div>
       </section>
 
-      <Modal title={editingOpportunity ? "编辑商机" : "新建商机"} open={opportunityOpen} onCancel={() => setOpportunityOpen(false)} footer={null} width={760} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
+      <Modal title="新建商机" open={opportunityOpen} onCancel={() => setOpportunityOpen(false)} footer={null} width={760} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
         <Form
           form={opportunityForm}
           layout="vertical"
           onFinish={(values) => opportunityMutation.mutate(values)}
           requiredMark={false}
-          initialValues={editingOpportunity ? {
-            customer: editingOpportunity.customer,
-            requirement: editingOpportunity.requirement || "",
-            source: editingOpportunity.source || "",
-            paymentTerms: editingOpportunity.paymentTerms || "",
-            status: editingOpportunity.status,
-            progress: editingOpportunity.progress || "",
-            notes: editingOpportunity.notes || "",
-          } : { status: "NOT_STARTED" }}
+          initialValues={{ status: "NOT_STARTED" }}
         >
           <Form.Item name="customer" label="客户" rules={[{ required: true, message: "请输入客户名称" }]}><Input /></Form.Item>
           <div className="two-fields"><Form.Item name="requirement" label="需求与现状"><Input.TextArea rows={3} /></Form.Item><Form.Item name="source" label="商机来源"><Input.TextArea rows={3} /></Form.Item></div>
@@ -511,22 +672,90 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         </Form>
       </Modal>
 
-      <Modal title={editingSupplier ? "编辑供应商" : "新建供应商"} open={supplierOpen} onCancel={() => setSupplierOpen(false)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
+      <Modal
+        title="附件管理"
+        open={Boolean(managedAttachmentRecord)}
+        onCancel={() => { setAttachmentTarget(null); setPreviewFile(null); }}
+        footer={null}
+        width={640}
+        centered
+        destroyOnHidden
+      >
+        {managedAttachmentRecord && attachmentTarget && <div className="attachment-manager">
+          <div className="attachment-manager-header">
+            <div><strong>{managedAttachmentName}</strong><span>共 {managedAttachmentRecord.attachments.length} 个附件</span></div>
+            <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id ? " is-loading" : ""}`}>
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
+                disabled={attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id}
+                onChange={(event) => {
+                  const file = event.currentTarget.files?.[0];
+                  if (file) attachmentMutation.mutate({ kind: attachmentTarget.kind, rowId: attachmentTarget.id, file });
+                  event.currentTarget.value = "";
+                }}
+              />
+              <Plus size={15} />
+              {attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id ? "上传中…" : "上传附件"}
+            </label>
+          </div>
+
+          {managedAttachmentRecord.attachments.length === 0
+            ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件，点击右上角上传" />
+            : <div className="attachment-list">{managedAttachmentRecord.attachments.map((file) => <div className="attachment-list-item" key={file.id}>
+              <span className="attachment-file-icon"><FileText size={19} /></span>
+              <Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip>
+              <Button size="small" icon={<Eye size={14} />} onClick={() => setPreviewFile(file)}>预览</Button>
+              <Button size="small" icon={<Download size={14} />} href={`/api/files/${file.id}?download=1`}>下载</Button>
+              <Button
+                size="small"
+                danger
+                type="text"
+                icon={<Trash2 size={14} />}
+                loading={deleteAttachmentMutation.isPending && deleteAttachmentMutation.variables?.id === file.id}
+                onClick={() => modal.confirm({
+                  title: "删除附件",
+                  content: `确认删除“${file.originalName}”吗？删除后无法恢复。`,
+                  okText: "删除",
+                  cancelText: "取消",
+                  okButtonProps: { danger: true },
+                  onOk: () => deleteAttachmentMutation.mutateAsync({ id: file.id, kind: attachmentTarget.kind }),
+                })}
+              >删除</Button>
+            </div>)}</div>}
+          <p className="attachment-manager-tip">支持 PDF、Word、Excel、JPG、PNG、WebP，单个文件最大 20MB。</p>
+        </div>}
+      </Modal>
+
+      <Modal
+        title={previewFile ? `附件预览：${previewFile.originalName}` : "附件预览"}
+        open={Boolean(previewFile)}
+        onCancel={() => setPreviewFile(null)}
+        width={920}
+        centered
+        destroyOnHidden
+        footer={previewFile ? [
+          <Button key="close" onClick={() => setPreviewFile(null)}>关闭</Button>,
+          <Button key="download" type="primary" icon={<Download size={15} />} href={`/api/files/${previewFile.id}?download=1`}>下载</Button>,
+        ] : null}
+      >
+        {previewFile?.mimeType.startsWith("image/")
+          ? <div className="attachment-preview"><img src={`/api/files/${previewFile.id}`} alt={previewFile.originalName} /></div>
+          : previewFile?.mimeType === "application/pdf"
+            ? <iframe className="attachment-preview-frame" src={`/api/files/${previewFile.id}`} title={previewFile.originalName} />
+            : <div className="attachment-preview-unsupported"><FileText size={42} /><strong>该文件格式暂不支持在线预览</strong><span>请点击“下载”后使用本地软件查看。</span></div>}
+      </Modal>
+
+      <Modal title="新建供应商" open={supplierOpen} onCancel={() => setSupplierOpen(false)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
         <Form
           form={supplierForm}
           layout="vertical"
           onFinish={(values) => supplierMutation.mutate(values)}
           requiredMark={false}
-          initialValues={editingSupplier ? {
-            name: editingSupplier.name,
-            account: editingSupplier.account,
-            password: "",
-            notes: editingSupplier.notes || "",
-          } : undefined}
         >
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入供应商名称" }]}><Input /></Form.Item>
           <Form.Item name="account" label="账号" rules={[{ required: true, message: "请输入账号" }]}><Input /></Form.Item>
-          <Form.Item name="password" label={editingSupplier ? "密码（不修改可留空）" : "密码"} rules={[{ required: !editingSupplier, message: "请输入密码" }]}><Input.Password placeholder={editingSupplier ? "留空则保留原密码" : ""} /></Form.Item>
+          <Form.Item name="password" label="密码" rules={[{ required: true, message: "请输入密码" }]}><Input.Password /></Form.Item>
           <Form.Item name="notes" label="备注"><Input.TextArea rows={4} /></Form.Item>
           <div className="modal-actions"><Button onClick={() => setSupplierOpen(false)}>取消</Button><Button type="primary" htmlType="submit" loading={supplierMutation.isPending}>保存供应商</Button></div>
         </Form>
@@ -536,7 +765,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         <Form form={linkedForm} layout="vertical" onFinish={(values) => linkedMutation.mutate(values)} requiredMark={false} initialValues={{ type: "CUSTOMER" }}>
           <Form.Item name="type" label="类型" rules={[{ required: true }]}><Select options={[{ value: "CUSTOMER", label: "客户" }, { value: "SUPPLIER", label: "供应商" }]} onChange={(value) => { setLinkedType(value); linkedForm.setFieldValue("targetId", undefined); }} /></Form.Item>
           <Form.Item name="targetId" label="名称" rules={[{ required: true, message: "请选择名称" }]}><Select showSearch optionFilterProp="label" options={entityOptions} placeholder="请选择关联对象" /></Form.Item>
-          <Form.Item name="record" label={linkedOpen === "contracts" ? "合同记录" : "付款记录"} valuePropName="fileList" getValueFromEvent={(event) => event?.fileList}><Upload maxCount={1} beforeUpload={() => false}><Button icon={<Paperclip size={16} />}>选择文件</Button></Upload></Form.Item>
+          <Form.Item name="record" label={linkedOpen === "contracts" ? "合同附件" : "付款附件"} valuePropName="fileList" getValueFromEvent={(event) => event?.fileList}><Upload multiple maxCount={20} beforeUpload={() => false}><Button icon={<Paperclip size={16} />}>选择附件</Button></Upload></Form.Item>
           <div className="modal-actions"><Button onClick={() => setLinkedOpen(null)}>取消</Button><Button type="primary" htmlType="submit" loading={linkedMutation.isPending}>{linkedOpen === "contracts" ? "保存合同" : "保存付款"}</Button></div>
         </Form>
       </Modal>
