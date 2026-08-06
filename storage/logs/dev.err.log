@@ -1,0 +1,5 @@
+Warning: You provided a `current` prop to a Pagination component without an `onChange` handler. This will render a read-only component.
+ ⚠ Cross origin request detected from 127.0.0.1 to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+Warning: You provided a `current` prop to a Pagination component without an `onChange` handler. This will render a read-only component.
+Warning: Portal only work in client side. Please call 'useEffect' to show Portal instead default render in SSR.

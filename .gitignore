@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.env
+.env.local
+.env.production
+storage/uploads/*
+!storage/uploads/.gitkeep
+npm-debug.log*
+pnpm-debug.log*
+*.tsbuildinfo

@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum OpportunityStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  FINISHED
+}
+
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+}
+
+model User {
+  id           String     @id @default(cuid())
+  username     String     @unique @db.VarChar(64)
+  passwordHash String     @db.VarChar(255)
+  role         UserRole   @default(USER)
+  enabled      Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  opportunities Opportunity[]
+  attachments  Attachment[]
+  auditLogs    AuditLog[]
+}
+
+model Opportunity {
+  id           String            @id @default(cuid())
+  customer     String            @db.VarChar(191)
+  requirement  String?           @db.Text
+  source       String?           @db.Text
+  paymentTerms String?           @db.VarChar(500)
+  status       OpportunityStatus @default(NOT_STARTED)
+  progress     String?           @db.Text
+  notes        String?           @db.Text
+  createdById  String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  createdBy    User              @relation(fields: [createdById], references: [id])
+  contracts    Contract[]
+  payments     Payment[]
+  attachments  Attachment[]
+
+  @@index([customer])
+  @@index([status])
+}
+
+model Supplier {
+  id                String     @id @default(cuid())
+  name              String     @unique @db.VarChar(191)
+  account           String     @db.VarChar(191)
+  encryptedPassword String     @db.Text
+  passwordIv        String     @db.VarChar(64)
+  passwordTag       String     @db.VarChar(64)
+  notes             String?    @db.Text
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  contracts         Contract[]
+  payments          Payment[]
+}
+
+model Contract {
+  id            String       @id @default(cuid())
+  name          String       @db.VarChar(191)
+  type          PartyType
+  opportunityId String?
+  supplierId    String?
+  recordFileId  String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  recordFile    Attachment?  @relation("ContractRecord", fields: [recordFileId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([opportunityId])
+  @@index([supplierId])
+}
+
+model Payment {
+  id            String       @id @default(cuid())
+  name          String       @db.VarChar(191)
+  type          PartyType
+  opportunityId String?
+  supplierId    String?
+  recordFileId  String?      @unique
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  supplier      Supplier?    @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  recordFile    Attachment?  @relation("PaymentRecord", fields: [recordFileId], references: [id], onDelete: SetNull)
+
+  @@index([type])
+  @@index([opportunityId])
+  @@index([supplierId])
+}
+
+model Attachment {
+  id             String       @id @default(cuid())
+  originalName   String       @db.VarChar(255)
+  storedName     String       @unique @db.VarChar(255)
+  filePath       String       @db.VarChar(1000)
+  mimeType       String       @db.VarChar(191)
+  fileSize       Int
+  uploadedById   String
+  opportunityId  String?
+  createdAt      DateTime     @default(now())
+  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
+  opportunity    Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  contractRecord Contract?    @relation("ContractRecord")
+  paymentRecord  Payment?     @relation("PaymentRecord")
+
+  @@index([opportunityId])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   @db.VarChar(64)
+  entityType String   @db.VarChar(64)
+  entityId   String?  @db.VarChar(191)
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([entityType, entityId])
+}
