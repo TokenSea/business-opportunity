@@ -114,16 +114,12 @@ a { color: var(--primary-ink); text-decoration: none; }
 .editable-cell-button:hover { background: var(--primary-soft); }
 .editable-status-button { display: inline-flex; padding: 2px; border: 0; border-radius: 999px; background: transparent; cursor: pointer; }
 .editable-status-button:hover { background: var(--primary-soft); }
-.inline-editor { width: 320px; display: grid; gap: 10px; }
-.inline-editor strong { font-size: 13px; font-weight: 500; }
-.inline-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.detail-inline-editor { width: 100%; display: grid; gap: 8px; }
+.detail-inline-editor-actions { display: flex; justify-content: flex-end; gap: 6px; }
 .password-reveal-row { display: flex; align-items: center; gap: 8px; }
 .password-reveal-row .ant-input { min-width: 0; flex: 1; }
-.status-editor { display: grid; gap: 10px; }
-.status-editor strong { font-size: 13px; font-weight: 500; }
-.status-editor-options { display: flex; gap: 6px; }
-.status-editor-options button { padding: 2px; border: 1px solid transparent; border-radius: 999px; background: transparent; cursor: pointer; }
-.status-editor-options button:hover, .status-editor-options button.selected { border-color: var(--primary); }
+.detail-inline-status-editor { width: 100%; display: flex; align-items: center; gap: 6px; }
+.detail-inline-status-editor .ant-select { min-width: 0; flex: 1; }
 .attachment-manager { display: grid; gap: 16px; }
 .attachment-manager-header { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
 .attachment-manager-header > div { display: grid; gap: 4px; min-width: 0; }

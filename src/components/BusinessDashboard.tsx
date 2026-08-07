@@ -28,7 +28,6 @@ import {
   Input,
   Modal,
   Pagination,
-  Popover,
   Select,
   Table,
   Tag,
@@ -127,7 +126,7 @@ function EditableTextCell({
   label: string;
   onSave: (value: string) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || "");
   const [saving, setSaving] = useState(false);
   if (!editable) return <CellText value={value} lines={lines} />;
@@ -136,30 +135,31 @@ function EditableTextCell({
     setSaving(true);
     try {
       await onSave(draft.trim());
-      setOpen(false);
+      setEditing(false);
     } finally {
       setSaving(false);
     }
   }
 
-  return <Popover
-    open={open}
-    onOpenChange={(next) => {
-      if (next) setDraft(value || "");
-      setOpen(next);
+  if (!editing) return <button
+    type="button"
+    className="editable-cell-button"
+    aria-label={`修改${label}`}
+    onClick={() => {
+      setDraft(value || "");
+      setEditing(true);
     }}
-    trigger="click"
-    placement="bottom"
-    content={<div className="inline-editor">
-      <strong>修改{label}</strong>
-      {lines === 2
-        ? <Input.TextArea value={draft} onChange={(event) => setDraft(event.target.value)} autoSize={{ minRows: 3, maxRows: 6 }} autoFocus />
-        : <Input value={draft} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />}
-      <div className="inline-editor-actions"><Button size="small" onClick={() => setOpen(false)}>取消</Button><Button size="small" type="primary" loading={saving} onClick={() => void save()}>保存</Button></div>
-    </div>}
-  >
-    <button type="button" className="editable-cell-button" aria-label={`修改${label}`}><CellText value={value} lines={lines} /></button>
-  </Popover>;
+  ><CellText value={value} lines={lines} /></button>;
+
+  return <div className="detail-inline-editor">
+    {lines === 2
+      ? <Input.TextArea aria-label={`编辑${label}`} value={draft} onChange={(event) => setDraft(event.target.value)} autoSize={{ minRows: 2, maxRows: 5 }} autoFocus />
+      : <Input aria-label={`编辑${label}`} value={draft} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />}
+    <div className="detail-inline-editor-actions">
+      <Button size="small" onClick={() => { setDraft(value || ""); setEditing(false); }}>取消</Button>
+      <Button size="small" type="primary" loading={saving} onClick={() => void save()}>保存</Button>
+    </div>
+  </div>;
 }
 
 function EditablePasswordCell({
@@ -175,7 +175,7 @@ function EditablePasswordCell({
   label?: string;
   hasValue?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
   const [revealed, setRevealed] = useState<string | null>(null);
@@ -189,7 +189,7 @@ function EditablePasswordCell({
     setSaving(true);
     try {
       await onSave(draft);
-      setOpen(false);
+      setEditing(false);
       setDraft("");
       setRevealed(null);
     } finally {
@@ -209,30 +209,28 @@ function EditablePasswordCell({
     }
   }
 
-  return <Popover
-    open={open}
-    onOpenChange={(next) => {
+  if (!editing) return <button
+    type="button"
+    className="editable-cell-button"
+    aria-label={`修改${label}`}
+    onClick={() => {
       setDraft("");
       setRevealed(null);
-      setOpen(next);
+      setEditing(true);
     }}
-    trigger="click"
-    placement="bottom"
-    content={<div className="inline-editor">
-      {onReveal && hasValue && <>
-        <strong>查看{label}</strong>
-        <div className="password-reveal-row">
-          <Input value={revealed ?? "••••••••"} readOnly />
-          <Button size="small" icon={<Eye size={14} />} loading={revealing} disabled={revealed !== null} onClick={() => void reveal()}>{revealed !== null ? "已显示" : "查看"}</Button>
-        </div>
-      </>}
-      <strong>修改{label}</strong>
-      <Input.Password value={draft} placeholder={`请输入新${label}`} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
-      <div className="inline-editor-actions"><Button size="small" onClick={() => setOpen(false)}>取消</Button><Button size="small" type="primary" disabled={!draft} loading={saving} onClick={() => void save()}>保存</Button></div>
+  >{displayed}</button>;
+
+  return <div className="detail-inline-editor detail-inline-password-editor">
+    {onReveal && hasValue && <div className="password-reveal-row">
+      <Input aria-label={`${label}明文`} value={revealed ?? "••••••••"} readOnly />
+      <Button size="small" icon={<Eye size={14} />} loading={revealing} disabled={revealed !== null} onClick={() => void reveal()}>{revealed !== null ? "已显示" : "查看"}</Button>
     </div>}
-  >
-    <button type="button" className="editable-cell-button" aria-label={`修改${label}`}>{displayed}</button>
-  </Popover>;
+    <Input.Password aria-label={`编辑${label}`} value={draft} placeholder={`请输入新${label}`} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
+    <div className="detail-inline-editor-actions">
+      <Button size="small" onClick={() => { setDraft(""); setRevealed(null); setEditing(false); }}>取消</Button>
+      <Button size="small" type="primary" disabled={!draft} loading={saving} onClick={() => void save()}>保存</Button>
+    </div>
+  </div>;
 }
 
 function EditableStatusCell({
@@ -244,43 +242,39 @@ function EditableStatusCell({
   editable: boolean;
   onSave: (value: OpportunityStatus) => Promise<void>;
 }) {
-  const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const tag = <Tag className={`status-tag status-${value.toLowerCase()}`}>{statusText[value]}</Tag>;
   if (!editable) return tag;
 
   async function choose(next: OpportunityStatus) {
     if (next === value) {
-      setOpen(false);
+      setEditing(false);
       return;
     }
     setSaving(true);
     try {
       await onSave(next);
-      setOpen(false);
+      setEditing(false);
     } finally {
       setSaving(false);
     }
   }
 
-  return <Popover
-    open={open}
-    onOpenChange={setOpen}
-    trigger="click"
-    placement="bottom"
-    content={<div className="status-editor">
-      <strong>选择状态</strong>
-      <div className="status-editor-options">{Object.entries(statusText).map(([key, label]) => <button
-        type="button"
-        key={key}
-        className={key === value ? "selected" : ""}
-        disabled={saving}
-        onClick={() => void choose(key as OpportunityStatus)}
-      ><Tag className={`status-tag status-${key.toLowerCase()}`}>{label}</Tag></button>)}</div>
-    </div>}
-  >
-    <button type="button" className="editable-status-button" aria-label="修改状态" onClick={() => setOpen(true)}>{tag}</button>
-  </Popover>;
+  if (!editing) return <button type="button" className="editable-status-button" aria-label="修改状态" onClick={() => setEditing(true)}>{tag}</button>;
+
+  return <div className="detail-inline-status-editor">
+    <Select
+      aria-label="编辑状态"
+      value={value}
+      loading={saving}
+      disabled={saving}
+      options={Object.entries(statusText).map(([next, label]) => ({ value: next, label }))}
+      onChange={(next) => void choose(next as OpportunityStatus)}
+      autoFocus
+    />
+    <Button size="small" disabled={saving} onClick={() => setEditing(false)}>取消</Button>
+  </div>;
 }
 
 export function BusinessDashboard({ user }: { user: SessionUser }) {
