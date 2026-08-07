@@ -94,3 +94,5 @@
  ○ Compiling /api/files/[id] ...
  ✓ Compiled /api/files/[id] in 1270ms (1549 modules)
  GET /api/files/cmsh7bqlc0009v1uwifswnb20 200 in 1623ms
+ GET /api/files/cmsh0dltc0034v1rc0wkarmo6 404 in 117ms
+[?25h

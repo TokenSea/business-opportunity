@@ -137,6 +137,9 @@ a { color: var(--primary-ink); text-decoration: none; }
 .login-brand span { width: 38px; height: 38px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #4f7cff, #7757e8); border-radius: 12px; }
 .login-box h1 { margin: 34px 0 8px; font-size: 26px; font-weight: 500; }
 .login-box > p { margin: 0 0 28px; color: var(--muted); }
+.auth-hint { margin: -6px 0 16px; color: var(--muted); font-size: 12px; }
+.auth-footer { margin: 22px 0 0 !important; text-align: center; font-size: 14px; }
+.auth-footer a { margin-left: 4px; font-weight: 500; }
 
 @media (max-width: 1000px) {
   .workspace { grid-template-columns: 76px minmax(0, 1fr); }

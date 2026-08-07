@@ -5,6 +5,11 @@ export const loginSchema = z.object({
   password: z.string().min(6).max(128),
 });
 
+export const registerSchema = z.object({
+  username: z.string().trim().min(2).max(64),
+  password: z.string().min(8).max(128),
+});
+
 export const opportunitySchema = z.object({
   customer: z.string().trim().min(1).max(191),
   requirement: z.string().trim().max(10000).optional().default(""),

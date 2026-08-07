@@ -707,7 +707,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               <Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip>
               <Button size="small" icon={<Eye size={14} />} onClick={() => setPreviewFile(file)}>预览</Button>
               <Button size="small" icon={<Download size={14} />} href={`/api/files/${file.id}?download=1`}>下载</Button>
-              <Button
+              {user.role === "ADMIN" && <Button
                 size="small"
                 danger
                 type="text"
@@ -721,7 +721,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                   okButtonProps: { danger: true },
                   onOk: () => deleteAttachmentMutation.mutateAsync({ id: file.id, kind: attachmentTarget.kind }),
                 })}
-              >删除</Button>
+              >删除</Button>}
             </div>)}</div>}
           <p className="attachment-manager-tip">支持 PDF、Word、Excel、JPG、PNG、WebP，单个文件最大 20MB。</p>
         </div>}

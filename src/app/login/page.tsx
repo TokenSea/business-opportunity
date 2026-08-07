@@ -2,6 +2,7 @@
 
 import { LockKeyhole, Sparkles, UserRound } from "lucide-react";
 import { App, Button, Form, Input } from "antd";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -45,6 +46,7 @@ export default function LoginPage() {
             </Form.Item>
             <Button type="primary" htmlType="submit" size="large" block loading={loading}>登录</Button>
           </Form>
+          <p className="auth-footer">还没有账号？<Link href="/register">立即注册</Link></p>
         </section>
       </main>
     </App>

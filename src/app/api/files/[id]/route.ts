@@ -27,6 +27,9 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") {
+    return NextResponse.json({ message: "仅管理员可以删除附件" }, { status: 403 });
+  }
   try {
     const { id } = await context.params;
     const file = await prisma.attachment.findUnique({
