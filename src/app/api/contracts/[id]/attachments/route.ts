@@ -6,6 +6,9 @@ import { attachFilesSchema } from "@/lib/validators";
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") {
+    return NextResponse.json({ message: "仅管理员可以上传合同附件" }, { status: 403 });
+  }
   try {
     const { id } = await context.params;
     const input = attachFilesSchema.parse(await request.json());

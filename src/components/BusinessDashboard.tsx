@@ -643,6 +643,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   }
 
   function openLinked(kind: "contracts" | "payments", type: PartyType, targetId: string, targetName: string) {
+    if (user.role !== "ADMIN") return;
     setLinkedOpen({ kind, type, targetId, targetName });
   }
 
@@ -673,7 +674,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     return <section className="linked-record-panel">
       <div className="linked-record-toolbar">
         <div><Icon size={18} /><strong>{label}管理</strong><span>{rows.length} 条</span></div>
-        {detailTarget && detailRecord && <Button
+        {user.role === "ADMIN" && detailTarget && detailRecord && <Button
           type="primary"
           className="create-record-button"
           icon={<Plus size={14} />}
@@ -928,7 +929,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       </Modal>
 
       <Modal
-        title={linkedDetailRecord ? `${linkedDetailTarget?.kind === "contracts" ? "合同" : "付款"}详情 · ${linkedDetailRecord.name}` : "记录详情"}
+        title={linkedDetailRecord ? `${linkedDetailTarget?.kind === "contracts" ? "合同" : "付款"}详情 · ${linkedDetailRecord.name}${user.role === "ADMIN" ? "" : "（只读）"}` : "记录详情"}
         open={Boolean(linkedDetailRecord)}
         onCancel={() => setLinkedDetailTarget(null)}
         footer={null}
@@ -941,11 +942,13 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           key={linkedDetailRecord.id}
           layout="vertical"
           form={linkedDetailForm}
-          onFinish={(values: LinkedDetailForm) => linkedUpdateMutation.mutate(values)}
+          onFinish={(values: LinkedDetailForm) => {
+            if (user.role === "ADMIN") linkedUpdateMutation.mutate(values);
+          }}
           requiredMark={false}
         >
-          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input maxLength={191} /></Form.Item>
-          <Form.Item name="notes" label="备注"><Input.TextArea rows={3} maxLength={10000} showCount /></Form.Item>
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input className="linked-record-readonly-field" maxLength={191} readOnly={user.role !== "ADMIN"} /></Form.Item>
+          <Form.Item name="notes" label="备注"><Input.TextArea className="linked-record-readonly-field" rows={3} maxLength={10000} showCount readOnly={user.role !== "ADMIN"} /></Form.Item>
           <div className="linked-record-meta">
             <div><span>创建时间</span><strong>{formatDateTime(linkedDetailRecord.createdAt)}</strong></div>
             <div><span>修改时间</span><strong>{formatDateTime(linkedDetailRecord.updatedAt)}</strong></div>
@@ -954,7 +957,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           <section className="linked-modal-attachments">
             <div className="linked-modal-attachments-heading">
               <div><Paperclip size={17} /><strong>附件管理</strong><span>{linkedDetailRecord.attachments.length} 个附件</span></div>
-              <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id ? " is-loading" : ""}`}>
+              {user.role === "ADMIN" && <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id ? " is-loading" : ""}`}>
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
@@ -967,7 +970,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                 />
                 <Plus size={14} />
                 {attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id ? "上传中…" : "上传附件"}
-              </label>
+              </label>}
             </div>
             {linkedDetailRecord.attachments.length === 0
               ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件" />
@@ -995,7 +998,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           </section>
 
           <div className="linked-detail-modal-actions">
-            <Button danger onClick={() => modal.confirm({
+            {user.role === "ADMIN" ? <>
+              <Button danger onClick={() => modal.confirm({
               title: `删除${linkedDetailTarget.kind === "contracts" ? "合同" : "付款"}记录`,
               content: "删除后，对应附件也会同步删除，且无法恢复。",
               okText: "删除",
@@ -1003,7 +1007,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               okButtonProps: { danger: true },
               onOk: () => deleteMutation.mutateAsync({ kind: linkedDetailTarget.kind, ids: [linkedDetailRecord.id] }),
             })}>删除记录</Button>
-            <div><Button onClick={() => setLinkedDetailTarget(null)}>关闭</Button><Button type="primary" htmlType="submit" loading={linkedUpdateMutation.isPending}>保存修改</Button></div>
+              <div><Button onClick={() => setLinkedDetailTarget(null)}>关闭</Button><Button type="primary" htmlType="submit" loading={linkedUpdateMutation.isPending}>保存修改</Button></div>
+            </> : <><span>普通用户仅可查看合同和付款记录</span><Button onClick={() => setLinkedDetailTarget(null)}>关闭</Button></>}
           </div>
         </Form>}
       </Modal>
@@ -1048,7 +1053,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         </Form>
       </Modal>
 
-      <Modal title={linkedOpen?.kind === "contracts" ? "新建合同" : "新建付款"} open={Boolean(linkedOpen)} onCancel={() => setLinkedOpen(null)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
+      <Modal title={linkedOpen?.kind === "contracts" ? "新建合同" : "新建付款"} open={user.role === "ADMIN" && Boolean(linkedOpen)} onCancel={() => setLinkedOpen(null)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
         <Form
           form={linkedCreateForm}
           layout="vertical"

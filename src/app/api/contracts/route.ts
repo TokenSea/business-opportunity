@@ -20,6 +20,9 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") {
+    return NextResponse.json({ message: "仅管理员可以新增合同" }, { status: 403 });
+  }
   try {
     const input = linkedRecordSchema.parse(await request.json());
     const attachmentIds = Array.from(new Set([
@@ -67,6 +70,9 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") {
+    return NextResponse.json({ message: "仅管理员可以删除合同" }, { status: 403 });
+  }
   try {
     const { ids } = deleteIdsSchema.parse(await request.json());
     const rows = await prisma.contract.findMany({

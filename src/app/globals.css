@@ -212,6 +212,9 @@ a { color: var(--primary-ink); text-decoration: none; }
 .linked-modal-attachment-list { max-height: 300px; padding: 10px; }
 .linked-detail-modal-actions { margin-top: 20px; padding-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--line); }
 .linked-detail-modal-actions > div { display: flex; gap: 8px; }
+.linked-detail-modal-actions > span { color: var(--muted); font-size: 13px; }
+.linked-record-readonly-field.ant-input[readonly] { color: var(--text); background: #fff; box-shadow: none; opacity: 1; cursor: default; }
+.linked-record-readonly-field.ant-input[readonly]:hover, .linked-record-readonly-field.ant-input[readonly]:focus { border-color: #d9d9d9; box-shadow: none; }
 .linked-create-target { margin-bottom: 18px; padding: 12px 14px; display: grid; gap: 4px; border-radius: 9px; background: var(--primary-soft); }
 .linked-create-target span { color: var(--muted); font-size: 12px; }
 .linked-create-target strong { color: var(--primary-ink); font-size: 14px; font-weight: 500; }
