@@ -10,8 +10,8 @@ export async function GET() {
   const rows = await prisma.payment.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      recordFile: { select: { id: true, originalName: true, mimeType: true } },
-      attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true } },
+      recordFile: { select: { id: true, originalName: true, mimeType: true, createdAt: true } },
+      attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true, createdAt: true } },
     },
   });
   return NextResponse.json(rows);
@@ -30,6 +30,7 @@ export async function POST(request: Request) {
       const payment = await tx.payment.create({
         data: {
           name: input.name,
+          notes: input.notes || null,
           type: input.type,
           opportunityId: input.type === "CUSTOMER" ? input.targetId : null,
           supplierId: input.type === "SUPPLIER" ? input.targetId : null,
@@ -52,8 +53,8 @@ export async function POST(request: Request) {
       return tx.payment.findUniqueOrThrow({
         where: { id: payment.id },
         include: {
-          recordFile: { select: { id: true, originalName: true, mimeType: true } },
-          attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true } },
+          recordFile: { select: { id: true, originalName: true, mimeType: true, createdAt: true } },
+          attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true, createdAt: true } },
         },
       });
     });

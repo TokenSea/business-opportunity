@@ -11,22 +11,35 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   try {
     const { id } = await context.params;
     const input = supplierUpdateSchema.parse(await request.json());
-    const encrypted = input.password ? encryptSupplierPassword(input.password) : {};
+    const websiteEncrypted = input.websitePassword ? encryptSupplierPassword(input.websitePassword) : null;
     const row = await prisma.$transaction(async (tx) => {
       const supplier = await tx.supplier.update({
         where: { id },
-        data: { name: input.name, account: input.account, notes: input.notes || null, ...encrypted },
+        data: {
+          name: input.name,
+          bankAccount: input.bankAccount || null,
+          websiteAccount: input.websiteAccount || null,
+          websiteUrl: input.websiteUrl || null,
+          notes: input.notes || null,
+          ...(websiteEncrypted ? {
+            encryptedWebsitePassword: websiteEncrypted.encryptedPassword,
+            websitePasswordIv: websiteEncrypted.passwordIv,
+            websitePasswordTag: websiteEncrypted.passwordTag,
+          } : {}),
+        },
       });
-      await Promise.all([
-        tx.contract.updateMany({ where: { supplierId: id }, data: { name: input.name } }),
-        tx.payment.updateMany({ where: { supplierId: id }, data: { name: input.name } }),
-      ]);
       await tx.auditLog.create({
         data: { userId: auth.user.id, action: "UPDATE", entityType: "SUPPLIER", entityId: id },
       });
       return supplier;
     });
-    return NextResponse.json({ ...row, encryptedPassword: undefined, passwordIv: undefined, passwordTag: undefined, password: "••••••••" });
+    return NextResponse.json({
+      ...row,
+      encryptedWebsitePassword: undefined,
+      websitePasswordIv: undefined,
+      websitePasswordTag: undefined,
+      websitePassword: row.encryptedWebsitePassword ? "••••••••" : "",
+    });
   } catch (error) {
     return apiError(error);
   }

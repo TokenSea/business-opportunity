@@ -38,18 +38,26 @@ import {
   type UploadFile,
 } from "antd";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, type Key } from "react";
+import { useEffect, useMemo, useState, type Key } from "react";
 import type { SessionUser } from "@/lib/auth";
 import type { AttachmentRef, LinkedRecord, Opportunity, OpportunityStatus, PartyType, Supplier } from "@/types/business";
 
 type PageKey = "opportunities" | "contracts" | "payments" | "suppliers";
 type VisiblePageKey = "opportunities" | "suppliers";
 type OpportunityForm = Omit<Opportunity, "id" | "attachments" | "createdAt" | "updatedAt">;
-type SupplierForm = { name: string; account: string; password: string; notes?: string };
-type LinkedForm = { record?: UploadFile[] };
-type LinkedCreateTarget = { kind: "contracts" | "payments"; type: PartyType; targetId: string; name: string };
+type SupplierForm = {
+  name: string;
+  bankAccount?: string;
+  websiteAccount?: string;
+  websitePassword?: string;
+  websiteUrl?: string;
+  notes?: string;
+};
+type LinkedForm = { name: string; notes?: string; record?: UploadFile[] };
+type LinkedDetailForm = { name: string; notes?: string };
+type LinkedCreateTarget = { kind: "contracts" | "payments"; type: PartyType; targetId: string; targetName: string };
 type EditableOpportunityField = "customer" | "requirement" | "source" | "paymentTerms" | "progress" | "notes";
-type EditableSupplierField = "name" | "account" | "password" | "notes";
+type EditableSupplierField = "name" | "bankAccount" | "websiteAccount" | "websitePassword" | "websiteUrl" | "notes";
 type AttachmentKind = "opportunities" | "contracts" | "payments";
 const PAGE_SIZE = 8;
 
@@ -66,6 +74,10 @@ const statusText: Record<OpportunityStatus, string> = {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(value));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 const deleteLabels: Record<PageKey, string> = {
@@ -150,12 +162,27 @@ function EditableTextCell({
   </Popover>;
 }
 
-function EditablePasswordCell({ editable, onSave }: { editable: boolean; onSave: (value: string) => Promise<void> }) {
+function EditablePasswordCell({
+  editable,
+  onSave,
+  onReveal,
+  label = "密码",
+  hasValue = true,
+}: {
+  editable: boolean;
+  onSave: (value: string) => Promise<void>;
+  onReveal?: () => Promise<string>;
+  label?: string;
+  hasValue?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [revealed, setRevealed] = useState<string | null>(null);
+  const [revealing, setRevealing] = useState(false);
   const masked = <span className="masked-password">••••••••</span>;
-  if (!editable) return masked;
+  const displayed = hasValue ? masked : <span className="cell-empty">—</span>;
+  if (!editable) return displayed;
 
   async function save() {
     if (!draft) return;
@@ -164,26 +191,47 @@ function EditablePasswordCell({ editable, onSave }: { editable: boolean; onSave:
       await onSave(draft);
       setOpen(false);
       setDraft("");
+      setRevealed(null);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function reveal() {
+    if (!onReveal) return;
+    setRevealing(true);
+    try {
+      setRevealed(await onReveal());
+    } catch {
+      // The parent displays the request error.
+    } finally {
+      setRevealing(false);
     }
   }
 
   return <Popover
     open={open}
     onOpenChange={(next) => {
-      if (next) setDraft("");
+      setDraft("");
+      setRevealed(null);
       setOpen(next);
     }}
     trigger="click"
     placement="bottom"
     content={<div className="inline-editor">
-      <strong>修改密码</strong>
-      <Input.Password value={draft} placeholder="请输入新密码" onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
+      {onReveal && hasValue && <>
+        <strong>查看{label}</strong>
+        <div className="password-reveal-row">
+          <Input value={revealed ?? "••••••••"} readOnly />
+          <Button size="small" icon={<Eye size={14} />} loading={revealing} disabled={revealed !== null} onClick={() => void reveal()}>{revealed !== null ? "已显示" : "查看"}</Button>
+        </div>
+      </>}
+      <strong>修改{label}</strong>
+      <Input.Password value={draft} placeholder={`请输入新${label}`} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
       <div className="inline-editor-actions"><Button size="small" onClick={() => setOpen(false)}>取消</Button><Button size="small" type="primary" disabled={!draft} loading={saving} onClick={() => void save()}>保存</Button></div>
     </div>}
   >
-    <button type="button" className="editable-cell-button" aria-label="修改密码">{masked}</button>
+    <button type="button" className="editable-cell-button" aria-label={`修改${label}`}>{displayed}</button>
   </Popover>;
 }
 
@@ -262,6 +310,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const [opportunityOpen, setOpportunityOpen] = useState(false);
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [linkedOpen, setLinkedOpen] = useState<LinkedCreateTarget | null>(null);
+  const [linkedDetailTarget, setLinkedDetailTarget] = useState<{ kind: "contracts" | "payments"; id: string } | null>(null);
   const [detailTarget, setDetailTarget] = useState<{ kind: VisiblePageKey; id: string } | null>(null);
   const [relatedView, setRelatedView] = useState<"contracts" | "payments">("contracts");
   const [attachmentTarget, setAttachmentTarget] = useState<{ kind: AttachmentKind; id: string } | null>(null);
@@ -269,6 +318,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const [opportunityFiles, setOpportunityFiles] = useState<UploadFile[]>([]);
   const [opportunityForm] = Form.useForm<OpportunityForm>();
   const [supplierForm] = Form.useForm<SupplierForm>();
+  const [linkedDetailForm] = Form.useForm<LinkedDetailForm>();
+  const [linkedCreateForm] = Form.useForm<LinkedForm>();
 
   const opportunitiesQuery = useQuery({
     queryKey: ["opportunities"],
@@ -293,6 +344,19 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const detailPayments = detailTarget
     ? payments.filter((item) => detailTarget.kind === "opportunities" ? item.opportunityId === detailTarget.id : item.supplierId === detailTarget.id)
     : [];
+  const linkedDetailRecord = linkedDetailTarget
+    ? linkedDetailTarget.kind === "contracts"
+      ? contracts.find((item) => item.id === linkedDetailTarget.id)
+      : payments.find((item) => item.id === linkedDetailTarget.id)
+    : null;
+
+  useEffect(() => {
+    if (linkedDetailRecord) linkedDetailForm.setFieldsValue({ name: linkedDetailRecord.name, notes: linkedDetailRecord.notes || "" });
+  }, [linkedDetailForm, linkedDetailRecord?.id, linkedDetailRecord?.name, linkedDetailRecord?.notes]);
+
+  useEffect(() => {
+    if (linkedOpen) linkedCreateForm.setFieldsValue({ name: `${linkedOpen.targetName}${linkedOpen.kind === "contracts" ? "合同" : "付款"}`, notes: "", record: [] });
+  }, [linkedCreateForm, linkedOpen?.kind, linkedOpen?.targetId, linkedOpen?.targetName]);
   const managedAttachmentRecord = attachmentTarget
     ? attachmentTarget.kind === "opportunities"
       ? opportunities.find((item) => item.id === attachmentTarget.id)
@@ -324,7 +388,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       });
     },
     onSuccess: async () => {
-      message.success("商机已新增，合同和付款已同步生成");
+      message.success("商机已新增");
       setOpportunityOpen(false);
       setOpportunityFiles([]);
       await invalidateBusiness();
@@ -339,7 +403,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       body: JSON.stringify(values),
     }),
     onSuccess: async () => {
-      message.success("供应商已新增，合同和付款已同步生成");
+      message.success("供应商已新增");
       setSupplierOpen(false);
       supplierForm.resetFields();
       await invalidateBusiness();
@@ -355,7 +419,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: linkedOpen.name,
+          name: values.name,
+          notes: values.notes || "",
           type: linkedOpen.type,
           targetId: linkedOpen.targetId,
           attachmentIds: uploaded.filter(Boolean).map((file) => file!.id),
@@ -365,6 +430,22 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     onSuccess: async () => {
       message.success(linkedOpen?.kind === "contracts" ? "合同已新增" : "付款已新增");
       setLinkedOpen(null);
+      await invalidateBusiness();
+    },
+    onError: (error) => message.error(error.message),
+  });
+
+  const linkedUpdateMutation = useMutation({
+    mutationFn: (values: LinkedDetailForm) => {
+      if (!linkedDetailTarget) throw new Error("缺少合同或付款记录");
+      return requestJson(`/api/${linkedDetailTarget.kind}/${linkedDetailTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(values),
+      });
+    },
+    onSuccess: async () => {
+      message.success(linkedDetailTarget?.kind === "contracts" ? "合同信息已更新" : "付款信息已更新");
       await invalidateBusiness();
     },
     onError: (error) => message.error(error.message),
@@ -416,8 +497,10 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: row.name,
-        account: row.account,
-        password: "",
+        bankAccount: row.bankAccount || "",
+        websiteAccount: row.websiteAccount || "",
+        websitePassword: "",
+        websiteUrl: row.websiteUrl || "",
         notes: row.notes || "",
         [field]: value,
       }),
@@ -449,6 +532,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       setSelectedIds((previous) => ({ ...previous, [variables.kind]: [] }));
       changePage(variables.kind, 1);
       if (detailTarget?.kind === variables.kind && variables.ids.includes(detailTarget.id)) setDetailTarget(null);
+      if (linkedDetailTarget?.kind === variables.kind && variables.ids.includes(linkedDetailTarget.id)) setLinkedDetailTarget(null);
       await invalidateBusiness();
     },
     onError: (error) => message.error(error.message),
@@ -460,7 +544,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   }), [keywords.opportunities, opportunities, status]);
 
   const filteredSuppliers = useMemo(() => suppliers.filter((item) => {
-    const text = [item.name, item.account, item.notes].join(" ").toLowerCase();
+    const text = [item.name, item.bankAccount, item.websiteAccount, item.websiteUrl, item.notes].join(" ").toLowerCase();
     return !keywords.suppliers || text.includes(keywords.suppliers.toLowerCase());
   }), [keywords.suppliers, suppliers]);
 
@@ -512,25 +596,14 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     await inlineSupplierMutation.mutateAsync({ row, field, value });
   }
 
-  function renderAttachmentUpload(kind: AttachmentKind, rowId: string, files: AttachmentRef[]) {
-    const variables = attachmentMutation.variables;
-    const isUploading = attachmentMutation.isPending && variables?.kind === kind && variables.rowId === rowId;
-    return <Tooltip title="点击选择并上传附件" mouseEnterDelay={0.4}>
-      <label className={`attachment-upload-trigger${isUploading ? " is-loading" : ""}`}>
-        <input
-          type="file"
-          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
-          disabled={isUploading}
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            if (file) attachmentMutation.mutate({ kind, rowId, file });
-            event.currentTarget.value = "";
-          }}
-        />
-        <Paperclip size={14} />
-        <span>{isUploading ? "上传中…" : `${files.length} 个附件`}</span>
-      </label>
-    </Tooltip>;
+  async function revealSupplierWebsitePassword(row: Supplier) {
+    try {
+      const result = await requestJson<{ password: string }>(`/api/suppliers/${row.id}/website-password`);
+      return result.password;
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "官网密码读取失败");
+      throw error;
+    }
   }
 
   const opportunityColumns: TableColumnsType<Opportunity> = [
@@ -545,7 +618,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
 
   const supplierColumns: TableColumnsType<Supplier> = [
     { title: "名称", dataIndex: "name", width: 220, className: "strong-cell", render: (value) => <CellText value={value} /> },
-    { title: "账号", dataIndex: "account", width: 240, render: (value) => <CellText value={value} /> },
+    { title: "官网账号", dataIndex: "websiteAccount", width: 200, render: (value) => <CellText value={value} /> },
+    { title: "官网地址", dataIndex: "websiteUrl", width: 280, render: (value) => <CellText value={value} /> },
     { title: "备注", dataIndex: "notes", width: 360, render: (value) => <CellText value={value} lines={2} /> },
     { title: "合同", width: 90, render: (_, row) => contracts.filter((item) => item.supplierId === row.id).length },
     { title: "付款", width: 90, render: (_, row) => payments.filter((item) => item.supplierId === row.id).length },
@@ -554,12 +628,14 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
 
   function openDetail(kind: VisiblePageKey, id: string) {
     setRelatedView("contracts");
+    setLinkedDetailTarget(null);
     setDetailTarget({ kind, id });
   }
 
   function closeDetail() {
     setDetailTarget(null);
     setAttachmentTarget(null);
+    setLinkedDetailTarget(null);
     setRelatedView("contracts");
   }
 
@@ -572,8 +648,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     setSupplierOpen(true);
   }
 
-  function openLinked(kind: "contracts" | "payments", type: PartyType, targetId: string, name: string) {
-    setLinkedOpen({ kind, type, targetId, name });
+  function openLinked(kind: "contracts" | "payments", type: PartyType, targetId: string, targetName: string) {
+    setLinkedOpen({ kind, type, targetId, targetName });
   }
 
   async function logout() {
@@ -593,45 +669,34 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     const Icon = isContract ? FileSignature : Landmark;
     const targetType: PartyType = detailTarget?.kind === "opportunities" ? "CUSTOMER" : "SUPPLIER";
     const targetName = detailRecord ? ("customer" in detailRecord ? detailRecord.customer : detailRecord.name) : "";
+    const columns: TableColumnsType<LinkedRecord> = [
+      { title: "名称", dataIndex: "name", width: 110, className: "strong-cell", render: (value) => <CellText value={value} /> },
+      { title: "创建时间", dataIndex: "createdAt", width: 130, render: (value: string) => formatDateTime(value) },
+      { title: "修改时间", dataIndex: "updatedAt", width: 130, render: (value: string) => formatDateTime(value) },
+      { title: "备注", dataIndex: "notes", width: 130, render: (value) => <CellText value={value} lines={2} /> },
+    ];
 
-    return <section className="detail-card linked-detail-card">
-      <div className="detail-card-heading">
+    return <section className="linked-record-panel">
+      <div className="linked-record-toolbar">
         <div><Icon size={18} /><strong>{label}管理</strong><span>{rows.length} 条</span></div>
         {detailTarget && detailRecord && <Button
-          size="small"
           type="primary"
-          ghost
+          className="create-record-button"
           icon={<Plus size={14} />}
           onClick={() => openLinked(kind, targetType, detailTarget.id, targetName)}
         >新增{label}</Button>}
       </div>
-      {rows.length === 0
-        ? <Empty className="linked-detail-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={`暂无${label}记录`} />
-        : <div className="linked-detail-list">{rows.map((row, index) => <div className="linked-detail-item" key={row.id}>
-          <div className="linked-detail-summary">
-            <span className="linked-detail-icon"><Icon size={17} /></span>
-            <div><strong>{label}记录 {rows.length - index}</strong><span>创建于 {formatDate(row.createdAt)}</span></div>
-          </div>
-          <div className="linked-detail-actions">
-            {renderAttachmentUpload(kind, row.id, row.attachments)}
-            <Button size="small" onClick={() => setAttachmentTarget({ kind, id: row.id })}>管理附件</Button>
-            <Button
-              size="small"
-              danger
-              type="text"
-              icon={<Trash2 size={14} />}
-              loading={deleteMutation.isPending && deleteMutation.variables?.kind === kind && deleteMutation.variables.ids.includes(row.id)}
-              onClick={() => modal.confirm({
-                title: `删除${label}记录`,
-                content: `确认删除这条${label}记录吗？对应的附件也会同步删除。`,
-                okText: "删除",
-                cancelText: "取消",
-                okButtonProps: { danger: true },
-                onOk: () => deleteMutation.mutateAsync({ kind, ids: [row.id] }),
-              })}
-            />
-          </div>
-        </div>)}</div>}
+      <Table
+        className="linked-record-table"
+        rowKey="id"
+        columns={columns}
+        dataSource={rows}
+        pagination={false}
+        tableLayout="fixed"
+        scroll={{ x: 500 }}
+        locale={{ emptyText: <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={`暂无${label}记录`} /> }}
+        onRow={(row) => ({ className: "clickable-row", onClick: () => setLinkedDetailTarget({ kind, id: row.id }) })}
+      />
     </section>;
   }
 
@@ -639,11 +704,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     return <section className="detail-card management-switch-card">
       <div className="detail-card-heading"><div><FileSignature size={18} /><strong>业务管理</strong></div><span>在左侧切换查看</span></div>
       <div className="management-switch-list">
-        <button type="button" className={relatedView === "contracts" ? "active" : ""} onClick={() => setRelatedView("contracts")}>
+        <button type="button" className={relatedView === "contracts" ? "active" : ""} onClick={() => { setRelatedView("contracts"); setLinkedDetailTarget(null); }}>
           <span className="management-switch-icon"><FileSignature size={18} /></span>
           <span><strong>合同管理</strong><small>{detailContracts.length} 条合同记录</small></span>
         </button>
-        <button type="button" className={relatedView === "payments" ? "active" : ""} onClick={() => setRelatedView("payments")}>
+        <button type="button" className={relatedView === "payments" ? "active" : ""} onClick={() => { setRelatedView("payments"); setLinkedDetailTarget(null); }}>
           <span className="management-switch-icon"><Landmark size={18} /></span>
           <span><strong>付款管理</strong><small>{detailPayments.length} 条付款记录</small></span>
         </button>
@@ -670,7 +735,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
 
               {page === "opportunities" && <>
                 <div className="table-toolbar">
-                  <Button type="primary" icon={<Plus size={16} />} onClick={openOpportunityCreate}>新建商机</Button>
+                  <Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openOpportunityCreate}>新建商机</Button>
                   <Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.opportunities.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "opportunities"} onClick={() => confirmDelete("opportunities")}>删除商机{selectedIds.opportunities.length ? ` (${selectedIds.opportunities.length})` : ""}</Button>
                   <div className="toolbar-spacer" />
                   <Input className="search-input" prefix={<Search size={16} />} placeholder="搜索客户、需求或进展" value={keywords.opportunities} onChange={(event) => changeKeyword("opportunities", event.target.value)} allowClear />
@@ -698,7 +763,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               </>}
 
               {page === "suppliers" && <>
-                <div className="table-toolbar"><Button type="primary" icon={<Plus size={16} />} onClick={openSupplierCreate}>新建供应商</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.suppliers.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "suppliers"} onClick={() => confirmDelete("suppliers")}>删除供应商{selectedIds.suppliers.length ? ` (${selectedIds.suppliers.length})` : ""}</Button><div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称、账号或备注" value={keywords.suppliers} onChange={(event) => changeKeyword("suppliers", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("suppliers", "")}>重置</Button></div>
+                <div className="table-toolbar"><Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openSupplierCreate}>新建供应商</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.suppliers.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "suppliers"} onClick={() => confirmDelete("suppliers")}>删除供应商{selectedIds.suppliers.length ? ` (${selectedIds.suppliers.length})` : ""}</Button><div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称、银行卡、官网或备注" value={keywords.suppliers} onChange={(event) => changeKeyword("suppliers", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("suppliers", "")}>重置</Button></div>
                 <div className="table-holder"><Table
                   rowKey="id"
                   rowSelection={rowSelectionFor("suppliers")}
@@ -707,7 +772,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                   loading={suppliersQuery.isLoading}
                   pagination={false}
                   tableLayout="fixed"
-                  scroll={{ x: 1130 }}
+                  scroll={{ x: 1370 }}
                   onRow={(row) => ({
                     className: "clickable-row",
                     onClick: (event) => {
@@ -783,10 +848,13 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
             <div className="detail-card-heading"><div><Warehouse size={18} /><strong>基本信息</strong></div><span className="detail-edit-tip">{user.role === "ADMIN" ? "点击字段可直接修改" : "只读"}</span></div>
             <div className="detail-field-grid">
               <div className="detail-field"><span>供应商名称</span><EditableTextCell value={detailRecord.name} editable={user.role === "ADMIN"} label="名称" onSave={(next) => saveSupplierField(detailRecord, "name", next)} /></div>
-              <div className="detail-field"><span>账号</span><EditableTextCell value={detailRecord.account} editable={user.role === "ADMIN"} label="账号" onSave={(next) => saveSupplierField(detailRecord, "account", next)} /></div>
-              <div className="detail-field"><span>密码</span><EditablePasswordCell editable={user.role === "ADMIN"} onSave={(next) => saveSupplierField(detailRecord, "password", next)} /></div>
-              <div className="detail-field"><span>更新时间</span><b>{formatDate(detailRecord.updatedAt)}</b></div>
+              <div className="detail-field"><span>银行卡账号</span><EditableTextCell value={detailRecord.bankAccount} editable={user.role === "ADMIN"} label="银行卡账号" onSave={(next) => saveSupplierField(detailRecord, "bankAccount", next)} /></div>
+              <div className="detail-field"><span>官网账号</span><EditableTextCell value={detailRecord.websiteAccount} editable={user.role === "ADMIN"} label="官网账号" onSave={(next) => saveSupplierField(detailRecord, "websiteAccount", next)} /></div>
+              <div className="detail-field"><span>官网密码</span><EditablePasswordCell editable={user.role === "ADMIN"} label="官网密码" hasValue={Boolean(detailRecord.websitePassword)} onReveal={() => revealSupplierWebsitePassword(detailRecord)} onSave={(next) => saveSupplierField(detailRecord, "websitePassword", next)} /></div>
+              <div className="detail-field detail-field-wide"><span>官网地址</span><EditableTextCell value={detailRecord.websiteUrl} editable={user.role === "ADMIN"} label="官网地址" onSave={(next) => saveSupplierField(detailRecord, "websiteUrl", next)} /></div>
               <div className="detail-field detail-field-wide"><span>备注</span><EditableTextCell value={detailRecord.notes} lines={2} editable={user.role === "ADMIN"} label="备注" onSave={(next) => saveSupplierField(detailRecord, "notes", next)} /></div>
+              <div className="detail-field"><span>创建时间</span><b>{formatDateTime(detailRecord.createdAt)}</b></div>
+              <div className="detail-field"><span>修改时间</span><b>{formatDateTime(detailRecord.updatedAt)}</b></div>
             </div>
           </section>
           {renderManagementSwitch()}
@@ -842,7 +910,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
             ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件，点击右上角上传" />
             : <div className="attachment-list">{managedAttachmentRecord.attachments.map((file) => <div className="attachment-list-item" key={file.id}>
               <span className="attachment-file-icon"><FileText size={19} /></span>
-              <Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip>
+              <div className="attachment-file-info"><Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip><small>上传于 {formatDateTime(file.createdAt)}</small></div>
               <Button size="small" icon={<Eye size={14} />} onClick={() => setPreviewFile(file)}>预览</Button>
               <Button size="small" icon={<Download size={14} />} href={`/api/files/${file.id}?download=1`}>下载</Button>
               {user.role === "ADMIN" && <Button
@@ -866,6 +934,87 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       </Modal>
 
       <Modal
+        title={linkedDetailRecord ? `${linkedDetailTarget?.kind === "contracts" ? "合同" : "付款"}详情 · ${linkedDetailRecord.name}` : "记录详情"}
+        open={Boolean(linkedDetailRecord)}
+        onCancel={() => setLinkedDetailTarget(null)}
+        footer={null}
+        width={760}
+        centered
+        destroyOnHidden
+        styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 5 } }}
+      >
+        {linkedDetailRecord && linkedDetailTarget && <Form
+          key={linkedDetailRecord.id}
+          layout="vertical"
+          form={linkedDetailForm}
+          onFinish={(values: LinkedDetailForm) => linkedUpdateMutation.mutate(values)}
+          requiredMark={false}
+        >
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input maxLength={191} /></Form.Item>
+          <Form.Item name="notes" label="备注"><Input.TextArea rows={3} maxLength={10000} showCount /></Form.Item>
+          <div className="linked-record-meta">
+            <div><span>创建时间</span><strong>{formatDateTime(linkedDetailRecord.createdAt)}</strong></div>
+            <div><span>修改时间</span><strong>{formatDateTime(linkedDetailRecord.updatedAt)}</strong></div>
+          </div>
+
+          <section className="linked-modal-attachments">
+            <div className="linked-modal-attachments-heading">
+              <div><Paperclip size={17} /><strong>附件管理</strong><span>{linkedDetailRecord.attachments.length} 个附件</span></div>
+              <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id ? " is-loading" : ""}`}>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
+                  disabled={attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id}
+                  onChange={(event) => {
+                    const file = event.currentTarget.files?.[0];
+                    if (file) attachmentMutation.mutate({ kind: linkedDetailTarget.kind, rowId: linkedDetailRecord.id, file });
+                    event.currentTarget.value = "";
+                  }}
+                />
+                <Plus size={14} />
+                {attachmentMutation.isPending && attachmentMutation.variables?.kind === linkedDetailTarget.kind && attachmentMutation.variables?.rowId === linkedDetailRecord.id ? "上传中…" : "上传附件"}
+              </label>
+            </div>
+            {linkedDetailRecord.attachments.length === 0
+              ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件" />
+              : <div className="attachment-list linked-modal-attachment-list">{linkedDetailRecord.attachments.map((file) => <div className="attachment-list-item" key={file.id}>
+                <span className="attachment-file-icon"><FileText size={19} /></span>
+                <div className="attachment-file-info"><Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip><small>上传于 {formatDateTime(file.createdAt)}</small></div>
+                <Button size="small" icon={<Eye size={14} />} onClick={() => setPreviewFile(file)}>预览</Button>
+                <Button size="small" icon={<Download size={14} />} href={`/api/files/${file.id}?download=1`}>下载</Button>
+                {user.role === "ADMIN" && <Button
+                  size="small"
+                  danger
+                  type="text"
+                  icon={<Trash2 size={14} />}
+                  loading={deleteAttachmentMutation.isPending && deleteAttachmentMutation.variables?.id === file.id}
+                  onClick={() => modal.confirm({
+                    title: "删除附件",
+                    content: `确认删除“${file.originalName}”吗？删除后无法恢复。`,
+                    okText: "删除",
+                    cancelText: "取消",
+                    okButtonProps: { danger: true },
+                    onOk: () => deleteAttachmentMutation.mutateAsync({ id: file.id, kind: linkedDetailTarget.kind }),
+                  })}
+                />}
+              </div>)}</div>}
+          </section>
+
+          <div className="linked-detail-modal-actions">
+            <Button danger onClick={() => modal.confirm({
+              title: `删除${linkedDetailTarget.kind === "contracts" ? "合同" : "付款"}记录`,
+              content: "删除后，对应附件也会同步删除，且无法恢复。",
+              okText: "删除",
+              cancelText: "取消",
+              okButtonProps: { danger: true },
+              onOk: () => deleteMutation.mutateAsync({ kind: linkedDetailTarget.kind, ids: [linkedDetailRecord.id] }),
+            })}>删除记录</Button>
+            <div><Button onClick={() => setLinkedDetailTarget(null)}>关闭</Button><Button type="primary" htmlType="submit" loading={linkedUpdateMutation.isPending}>保存修改</Button></div>
+          </div>
+        </Form>}
+      </Modal>
+
+      <Modal
         title={previewFile ? `附件预览：${previewFile.originalName}` : "附件预览"}
         open={Boolean(previewFile)}
         onCancel={() => setPreviewFile(null)}
@@ -884,7 +1033,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
             : <div className="attachment-preview-unsupported"><FileText size={42} /><strong>该文件格式暂不支持在线预览</strong><span>请点击“下载”后使用本地软件查看。</span></div>}
       </Modal>
 
-      <Modal title="新建供应商" open={supplierOpen} onCancel={() => setSupplierOpen(false)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
+      <Modal title="新建供应商" open={supplierOpen} onCancel={() => setSupplierOpen(false)} footer={null} width={720} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
         <Form
           form={supplierForm}
           layout="vertical"
@@ -892,16 +1041,29 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           requiredMark={false}
         >
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入供应商名称" }]}><Input /></Form.Item>
-          <Form.Item name="account" label="账号" rules={[{ required: true, message: "请输入账号" }]}><Input /></Form.Item>
-          <Form.Item name="password" label="密码" rules={[{ required: true, message: "请输入密码" }]}><Input.Password /></Form.Item>
+          <div className="two-fields">
+            <Form.Item name="bankAccount" label="银行卡账号"><Input /></Form.Item>
+            <Form.Item name="websiteAccount" label="官网账号"><Input /></Form.Item>
+          </div>
+          <div className="two-fields">
+            <Form.Item name="websitePassword" label="官网密码"><Input.Password autoComplete="new-password" /></Form.Item>
+            <Form.Item name="websiteUrl" label="官网地址"><Input placeholder="例如：https://example.com" /></Form.Item>
+          </div>
           <Form.Item name="notes" label="备注"><Input.TextArea rows={4} /></Form.Item>
           <div className="modal-actions"><Button onClick={() => setSupplierOpen(false)}>取消</Button><Button type="primary" htmlType="submit" loading={supplierMutation.isPending}>保存供应商</Button></div>
         </Form>
       </Modal>
 
       <Modal title={linkedOpen?.kind === "contracts" ? "新建合同" : "新建付款"} open={Boolean(linkedOpen)} onCancel={() => setLinkedOpen(null)} footer={null} centered destroyOnHidden styles={{ body: { maxHeight: "calc(100vh - 150px)", overflowY: "auto", paddingRight: 4 } }}>
-        <Form layout="vertical" onFinish={(values) => linkedMutation.mutate(values)} requiredMark={false} clearOnDestroy>
-          <div className="linked-create-target"><span>关联对象</span><strong>{linkedOpen?.name}</strong></div>
+        <Form
+          form={linkedCreateForm}
+          layout="vertical"
+          onFinish={(values: LinkedForm) => linkedMutation.mutate(values)}
+          requiredMark={false}
+        >
+          <div className="linked-create-target"><span>关联对象</span><strong>{linkedOpen?.targetName}</strong></div>
+          <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input maxLength={191} /></Form.Item>
+          <Form.Item name="notes" label="备注"><Input.TextArea rows={3} maxLength={10000} showCount /></Form.Item>
           <Form.Item name="record" label={linkedOpen?.kind === "contracts" ? "合同附件" : "付款附件"} valuePropName="fileList" getValueFromEvent={(event) => event?.fileList}><Upload multiple maxCount={20} beforeUpload={() => false}><Button icon={<Paperclip size={16} />}>选择附件</Button></Upload></Form.Item>
           <div className="modal-actions"><Button onClick={() => setLinkedOpen(null)}>取消</Button><Button type="primary" htmlType="submit" loading={linkedMutation.isPending}>{linkedOpen?.kind === "contracts" ? "保存合同" : "保存付款"}</Button></div>
         </Form>

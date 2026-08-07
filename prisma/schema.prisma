@@ -58,22 +58,25 @@ model Opportunity {
 }
 
 model Supplier {
-  id                String     @id @default(cuid())
-  name              String     @unique @db.VarChar(191)
-  account           String     @db.VarChar(191)
-  encryptedPassword String     @db.Text
-  passwordIv        String     @db.VarChar(64)
-  passwordTag       String     @db.VarChar(64)
-  notes             String?    @db.Text
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  contracts         Contract[]
-  payments          Payment[]
+  id                       String     @id @default(cuid())
+  name                     String     @unique @db.VarChar(191)
+  bankAccount              String?    @db.VarChar(191)
+  websiteAccount           String?    @db.VarChar(191)
+  encryptedWebsitePassword String?    @db.Text
+  websitePasswordIv        String?    @db.VarChar(64)
+  websitePasswordTag       String?    @db.VarChar(64)
+  websiteUrl               String?    @db.Text
+  notes                    String?    @db.Text
+  createdAt                DateTime   @default(now())
+  updatedAt                DateTime   @updatedAt
+  contracts                Contract[]
+  payments                 Payment[]
 }
 
 model Contract {
   id            String       @id @default(cuid())
   name          String       @db.VarChar(191)
+  notes         String?      @db.Text
   type          PartyType
   opportunityId String?
   supplierId    String?
@@ -93,6 +96,7 @@ model Contract {
 model Payment {
   id            String       @id @default(cuid())
   name          String       @db.VarChar(191)
+  notes         String?      @db.Text
   type          PartyType
   opportunityId String?
   supplierId    String?

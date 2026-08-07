@@ -1,0 +1,3 @@
+ALTER TABLE `Contract` ADD COLUMN `notes` TEXT NULL;
+
+ALTER TABLE `Payment` ADD COLUMN `notes` TEXT NULL;

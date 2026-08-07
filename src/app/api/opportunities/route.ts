@@ -9,7 +9,7 @@ export async function GET() {
   if (auth.error) return auth.error;
   const rows = await prisma.opportunity.findMany({
     orderBy: { createdAt: "desc" },
-    include: { attachments: { select: { id: true, originalName: true, mimeType: true } } },
+    include: { attachments: { select: { id: true, originalName: true, mimeType: true, createdAt: true } } },
   });
   return NextResponse.json(rows);
 }
@@ -31,12 +31,6 @@ export async function POST(request: Request) {
           notes: input.notes || null,
           createdById: auth.user.id,
         },
-      });
-      await tx.contract.create({
-        data: { name: opportunity.customer, type: "CUSTOMER", opportunityId: opportunity.id },
-      });
-      await tx.payment.create({
-        data: { name: opportunity.customer, type: "CUSTOMER", opportunityId: opportunity.id },
       });
       if (input.attachmentIds.length) {
         await tx.attachment.updateMany({

@@ -23,10 +23,6 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
           notes: input.notes || null,
         },
       });
-      await Promise.all([
-        tx.contract.updateMany({ where: { opportunityId: id }, data: { name: input.customer } }),
-        tx.payment.updateMany({ where: { opportunityId: id }, data: { name: input.customer } }),
-      ]);
       if (input.attachmentIds.length) {
         await tx.attachment.updateMany({
           where: { id: { in: input.attachmentIds }, uploadedById: auth.user.id, opportunityId: null, contractId: null, paymentId: null },

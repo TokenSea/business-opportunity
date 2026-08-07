@@ -9,9 +9,14 @@ export async function GET() {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
   const rows = await prisma.supplier.findMany({ orderBy: { createdAt: "desc" } });
-  return NextResponse.json(rows.map(({ encryptedPassword, passwordIv, passwordTag, ...row }) => ({
+  return NextResponse.json(rows.map(({
+    encryptedWebsitePassword,
+    websitePasswordIv,
+    websitePasswordTag,
+    ...row
+  }) => ({
     ...row,
-    password: "••••••••",
+    websitePassword: encryptedWebsitePassword ? "••••••••" : "",
   })));
 }
 
@@ -20,23 +25,34 @@ export async function POST(request: Request) {
   if (auth.error) return auth.error;
   try {
     const input = supplierSchema.parse(await request.json());
-    const encrypted = encryptSupplierPassword(input.password);
+    const websiteEncrypted = input.websitePassword ? encryptSupplierPassword(input.websitePassword) : null;
     const row = await prisma.$transaction(async (tx) => {
       const supplier = await tx.supplier.create({
-        data: { name: input.name, account: input.account, notes: input.notes || null, ...encrypted },
-      });
-      await tx.contract.create({
-        data: { name: supplier.name, type: "SUPPLIER", supplierId: supplier.id },
-      });
-      await tx.payment.create({
-        data: { name: supplier.name, type: "SUPPLIER", supplierId: supplier.id },
+        data: {
+          name: input.name,
+          bankAccount: input.bankAccount || null,
+          websiteAccount: input.websiteAccount || null,
+          websiteUrl: input.websiteUrl || null,
+          notes: input.notes || null,
+          ...(websiteEncrypted ? {
+            encryptedWebsitePassword: websiteEncrypted.encryptedPassword,
+            websitePasswordIv: websiteEncrypted.passwordIv,
+            websitePasswordTag: websiteEncrypted.passwordTag,
+          } : {}),
+        },
       });
       await tx.auditLog.create({
         data: { userId: auth.user.id, action: "CREATE", entityType: "SUPPLIER", entityId: supplier.id },
       });
       return supplier;
     });
-    return NextResponse.json({ ...row, encryptedPassword: undefined, passwordIv: undefined, passwordTag: undefined, password: "••••••••" }, { status: 201 });
+    return NextResponse.json({
+      ...row,
+      encryptedWebsitePassword: undefined,
+      websitePasswordIv: undefined,
+      websitePasswordTag: undefined,
+      websitePassword: row.encryptedWebsitePassword ? "••••••••" : "",
+    }, { status: 201 });
   } catch (error) {
     return apiError(error);
   }

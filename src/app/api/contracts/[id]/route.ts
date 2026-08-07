@@ -1,29 +1,24 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { linkedRecordFileSchema } from "@/lib/validators";
+import { linkedRecordUpdateSchema } from "@/lib/validators";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
   try {
     const { id } = await context.params;
-    const input = linkedRecordFileSchema.parse(await request.json());
+    const input = linkedRecordUpdateSchema.parse(await request.json());
     const row = await prisma.$transaction(async (tx) => {
-      const attached = await tx.attachment.updateMany({
-        where: { id: input.recordFileId, uploadedById: auth.user.id, opportunityId: null, contractId: null, paymentId: null },
-        data: { contractId: id },
-      });
-      if (attached.count !== 1) throw new Error("合同附件关联失败");
-      await tx.contract.update({ where: { id }, data: { recordFileId: input.recordFileId } });
+      await tx.contract.update({ where: { id }, data: { name: input.name, notes: input.notes || null } });
       await tx.auditLog.create({
-        data: { userId: auth.user.id, action: "UPLOAD_RECORD", entityType: "CONTRACT", entityId: id },
+        data: { userId: auth.user.id, action: "UPDATE", entityType: "CONTRACT", entityId: id },
       });
       return tx.contract.findUniqueOrThrow({
         where: { id },
         include: {
-          recordFile: { select: { id: true, originalName: true, mimeType: true } },
-          attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true } },
+          recordFile: { select: { id: true, originalName: true, mimeType: true, createdAt: true } },
+          attachments: { orderBy: { createdAt: "desc" }, select: { id: true, originalName: true, mimeType: true, createdAt: true } },
         },
       });
     });

@@ -2,7 +2,7 @@ export type UserRole = "ADMIN" | "USER";
 export type OpportunityStatus = "NOT_STARTED" | "IN_PROGRESS" | "FINISHED";
 export type PartyType = "CUSTOMER" | "SUPPLIER";
 
-export type AttachmentRef = { id: string; originalName: string; mimeType: string };
+export type AttachmentRef = { id: string; originalName: string; mimeType: string; createdAt: string };
 
 export type Opportunity = {
   id: string;
@@ -21,8 +21,10 @@ export type Opportunity = {
 export type Supplier = {
   id: string;
   name: string;
-  account: string;
-  password: string;
+  bankAccount: string | null;
+  websiteAccount: string | null;
+  websitePassword: string;
+  websiteUrl: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -31,10 +33,12 @@ export type Supplier = {
 export type LinkedRecord = {
   id: string;
   name: string;
+  notes: string | null;
   type: PartyType;
   opportunityId: string | null;
   supplierId: string | null;
   recordFile: AttachmentRef | null;
   attachments: AttachmentRef[];
   createdAt: string;
+  updatedAt: string;
 };

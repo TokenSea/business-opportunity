@@ -23,25 +23,29 @@ export const opportunitySchema = z.object({
 
 export const supplierSchema = z.object({
   name: z.string().trim().min(1).max(191),
-  account: z.string().trim().min(1).max(191),
-  password: z.string().min(1).max(500),
+  bankAccount: z.string().trim().max(191).optional().default(""),
+  websiteAccount: z.string().trim().max(191).optional().default(""),
+  websitePassword: z.string().max(500).optional().default(""),
+  websiteUrl: z.string().trim().max(2048).optional().default(""),
   notes: z.string().trim().max(10000).optional().default(""),
 });
 
 export const supplierUpdateSchema = supplierSchema.extend({
-  password: z.string().max(500).optional().default(""),
+  websitePassword: z.string().max(500).optional().default(""),
 });
 
 export const linkedRecordSchema = z.object({
   name: z.string().trim().min(1).max(191),
+  notes: z.string().trim().max(10000).optional().default(""),
   type: z.enum(["CUSTOMER", "SUPPLIER"]),
   targetId: z.string().min(1),
   recordFileId: z.string().nullable().optional(),
   attachmentIds: z.array(z.string().min(1)).max(20).optional().default([]),
 });
 
-export const linkedRecordFileSchema = z.object({
-  recordFileId: z.string().min(1),
+export const linkedRecordUpdateSchema = z.object({
+  name: z.string().trim().min(1).max(191),
+  notes: z.string().trim().max(10000).optional().default(""),
 });
 
 export const deleteIdsSchema = z.object({
