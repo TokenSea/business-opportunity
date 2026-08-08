@@ -21,6 +21,16 @@ function authSecret() {
   return new TextEncoder().encode("development-only-auth-secret-change-me");
 }
 
+function sessionCookieSecure() {
+  const configured = process.env.AUTH_COOKIE_SECURE?.trim().toLowerCase();
+  if (configured === "true") return true;
+  if (configured === "false") return false;
+  if (configured) {
+    throw new Error("AUTH_COOKIE_SECURE 必须配置为 true 或 false");
+  }
+  return process.env.NODE_ENV === "production";
+}
+
 export async function createSession(user: SessionUser) {
   const token = await new SignJWT({ username: user.username, role: user.role })
     .setProtectedHeader({ alg: "HS256" })
@@ -33,7 +43,7 @@ export async function createSession(user: SessionUser) {
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: sessionCookieSecure(),
     path: "/",
     maxAge: SESSION_TTL,
   });
@@ -41,7 +51,13 @@ export async function createSession(user: SessionUser) {
 
 export async function clearSession() {
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, "", { httpOnly: true, path: "/", maxAge: 0 });
+  cookieStore.set(SESSION_COOKIE, "", {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: sessionCookieSecure(),
+    path: "/",
+    maxAge: 0,
+  });
 }
 
 export async function getSessionPayload(): Promise<SessionUser | null> {

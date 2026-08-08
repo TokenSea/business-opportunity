@@ -85,6 +85,7 @@ Copy-Item .env.example .env
 ```dotenv
 DATABASE_URL="mysql://root:password@127.0.0.1:3306/business_opportunity"
 AUTH_SECRET="replace-with-at-least-32-random-characters"
+AUTH_COOKIE_SECURE="false"
 SUPPLIER_PASSWORD_KEY="replace-with-64-hex-characters"
 UPLOAD_DIR="./storage/uploads"
 SEED_ADMIN_USERNAME="admin"
@@ -127,6 +128,7 @@ npm run dev
 | --- | --- | --- |
 | `DATABASE_URL` | 是 | Prisma 使用的 MySQL 连接地址 |
 | `AUTH_SECRET` | 生产环境必需 | JWT 签名密钥，建议使用至少 32 字节的随机值；更换后现有登录会话会失效 |
+| `AUTH_COOKIE_SECURE` | 可选 | HTTPS 部署设为 `true`；仅使用 HTTP 时设为 `false`。生产环境未配置时默认启用安全 Cookie |
 | `SUPPLIER_PASSWORD_KEY` | 生产环境必需 | 64 位十六进制字符串，用于加密供应商官网密码 |
 | `UPLOAD_DIR` | 建议显式配置 | 附件持久化目录，默认是项目下的 `storage/uploads` |
 | `SEED_ADMIN_USERNAME` | 否 | 执行初始化脚本时创建或更新的管理员账号 |

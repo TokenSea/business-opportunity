@@ -169,6 +169,8 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: AUTH_COOKIE_SECURE
+              value: "false"
             - name: UPLOAD_DIR
               value: /app/storage/uploads
           envFrom:
