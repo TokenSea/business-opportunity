@@ -228,5 +228,5 @@ spec:
     app: business-opportunity
   ports:
     - name: http
-      port: 80
+      port: 3456
       targetPort: http
