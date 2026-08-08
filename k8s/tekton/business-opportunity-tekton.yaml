@@ -261,6 +261,5 @@ spec:
     eventlistener: business-opportunity-listener
   ports:
     - name: http-listener
-      port: 8080
+      port: 3456
       targetPort: 8080
-
