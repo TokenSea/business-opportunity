@@ -17,6 +17,7 @@
 
 - `tokensea/business-opportunity-mysql`
 - `tokensea/business-opportunity-app`
+- `tokensea/business-opportunity-registry`
 - `default/github-ssh-secret-business-opportunity`
 - `default/business-opportunity-webhook-secret`
 
@@ -35,4 +36,3 @@
 4. Pipeline 同时更新迁移 initContainer 和应用容器镜像。
 5. Deployment 扩容到 1，initContainer 执行 `prisma migrate deploy`。
 6. Tekton 等待 Deployment rollout 完成。
-

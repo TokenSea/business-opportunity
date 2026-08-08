@@ -138,6 +138,8 @@ spec:
       labels:
         app: business-opportunity
     spec:
+      imagePullSecrets:
+        - name: business-opportunity-registry
       securityContext:
         fsGroup: 1001
         fsGroupChangePolicy: OnRootMismatch
@@ -228,4 +230,3 @@ spec:
     - name: http
       port: 80
       targetPort: http
-
