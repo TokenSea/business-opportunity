@@ -48,6 +48,16 @@ export const linkedRecordUpdateSchema = z.object({
   notes: z.string().trim().max(10000).optional().default(""),
 });
 
+const paymentAmountSchema = z.coerce.number().positive().max(9999999999999.99);
+
+export const paymentRecordSchema = linkedRecordSchema.extend({
+  amount: paymentAmountSchema,
+});
+
+export const paymentRecordUpdateSchema = linkedRecordUpdateSchema.extend({
+  amount: paymentAmountSchema,
+});
+
 export const deleteIdsSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(100),
 });

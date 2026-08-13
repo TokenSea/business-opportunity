@@ -96,6 +96,7 @@ model Contract {
 model Payment {
   id            String       @id @default(cuid())
   name          String       @db.VarChar(191)
+  amount        Decimal?     @db.Decimal(15, 2)
   notes         String?      @db.Text
   type          PartyType
   opportunityId String?

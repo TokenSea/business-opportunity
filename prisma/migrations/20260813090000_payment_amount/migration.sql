@@ -1,0 +1,1 @@
+ALTER TABLE `Payment` ADD COLUMN `amount` DECIMAL(15, 2) NULL;

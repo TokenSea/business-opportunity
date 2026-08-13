@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { prisma } from "@/lib/prisma";
-import { linkedRecordUpdateSchema } from "@/lib/validators";
+import { paymentRecordUpdateSchema } from "@/lib/validators";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const auth = await requireApiUser();
@@ -11,9 +11,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
   try {
     const { id } = await context.params;
-    const input = linkedRecordUpdateSchema.parse(await request.json());
+    const input = paymentRecordUpdateSchema.parse(await request.json());
     const row = await prisma.$transaction(async (tx) => {
-      await tx.payment.update({ where: { id }, data: { name: input.name, notes: input.notes || null } });
+      await tx.payment.update({ where: { id }, data: { name: input.name, amount: input.amount, notes: input.notes || null } });
       await tx.auditLog.create({
         data: { userId: auth.user.id, action: "UPDATE", entityType: "PAYMENT", entityId: id },
       });

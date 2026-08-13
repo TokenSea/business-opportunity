@@ -26,6 +26,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Modal,
   Pagination,
   Select,
@@ -52,8 +53,8 @@ type SupplierForm = {
   websiteUrl?: string;
   notes?: string;
 };
-type LinkedForm = { name: string; notes?: string; record?: UploadFile[] };
-type LinkedDetailForm = { name: string; notes?: string };
+type LinkedForm = { name: string; amount?: number; notes?: string; record?: UploadFile[] };
+type LinkedDetailForm = { name: string; amount?: number; notes?: string };
 type LinkedCreateTarget = { kind: "contracts" | "payments"; type: PartyType; targetId: string; targetName: string };
 type EditableOpportunityField = "customer" | "requirement" | "source" | "paymentTerms" | "progress" | "notes";
 type EditableSupplierField = "name" | "bankAccount" | "websiteAccount" | "websitePassword" | "websiteUrl" | "notes";
@@ -77,6 +78,11 @@ function formatDate(value: string) {
 
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function formatCurrency(value: string | number) {
+  const amount = typeof value === "number" ? value : Number(value);
+  return `¥${new Intl.NumberFormat("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount)}`;
 }
 
 const deleteLabels: Record<PageKey, string> = {
@@ -345,11 +351,15 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     : null;
 
   useEffect(() => {
-    if (linkedDetailRecord) linkedDetailForm.setFieldsValue({ name: linkedDetailRecord.name, notes: linkedDetailRecord.notes || "" });
-  }, [linkedDetailForm, linkedDetailRecord?.id, linkedDetailRecord?.name, linkedDetailRecord?.notes]);
+    if (linkedDetailRecord) linkedDetailForm.setFieldsValue({
+      name: linkedDetailRecord.name,
+      amount: linkedDetailTarget?.kind === "payments" && linkedDetailRecord.amount != null ? Number(linkedDetailRecord.amount) : undefined,
+      notes: linkedDetailRecord.notes || "",
+    });
+  }, [linkedDetailForm, linkedDetailRecord?.id, linkedDetailRecord?.name, linkedDetailRecord?.amount, linkedDetailRecord?.notes, linkedDetailTarget?.kind]);
 
   useEffect(() => {
-    if (linkedOpen) linkedCreateForm.setFieldsValue({ name: `${linkedOpen.targetName}${linkedOpen.kind === "contracts" ? "合同" : "付款"}`, notes: "", record: [] });
+    if (linkedOpen) linkedCreateForm.setFieldsValue({ name: `${linkedOpen.targetName}${linkedOpen.kind === "contracts" ? "合同" : "付款"}`, amount: undefined, notes: "", record: [] });
   }, [linkedCreateForm, linkedOpen?.kind, linkedOpen?.targetId, linkedOpen?.targetName]);
   const managedAttachmentRecord = attachmentTarget
     ? attachmentTarget.kind === "opportunities"
@@ -414,6 +424,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: values.name,
+          ...(linkedOpen.kind === "payments" ? { amount: values.amount } : {}),
           notes: values.notes || "",
           type: linkedOpen.type,
           targetId: linkedOpen.targetId,
@@ -435,7 +446,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       return requestJson(`/api/${linkedDetailTarget.kind}/${linkedDetailTarget.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
+        body: JSON.stringify({
+          name: values.name,
+          ...(linkedDetailTarget.kind === "payments" ? { amount: values.amount } : {}),
+          notes: values.notes || "",
+        }),
       });
     },
     onSuccess: async () => {
@@ -664,16 +679,28 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     const Icon = isContract ? FileSignature : Landmark;
     const targetType: PartyType = detailTarget?.kind === "opportunities" ? "CUSTOMER" : "SUPPLIER";
     const targetName = detailRecord ? ("customer" in detailRecord ? detailRecord.customer : detailRecord.name) : "";
+    const paymentTotal = rows.reduce((total, row) => total + (row.amount == null ? 0 : Number(row.amount)), 0);
+    const pendingAmountCount = rows.filter((row) => row.amount == null).length;
     const columns: TableColumnsType<LinkedRecord> = [
       { title: "名称", dataIndex: "name", width: 110, className: "strong-cell", render: (value) => <CellText value={value} /> },
-      { title: "创建时间", dataIndex: "createdAt", width: 130, render: (value: string) => formatDateTime(value) },
-      { title: "修改时间", dataIndex: "updatedAt", width: 130, render: (value: string) => formatDateTime(value) },
+      ...(!isContract ? [{
+        title: "金额",
+        dataIndex: "amount",
+        width: 130,
+        align: "center" as const,
+        className: "payment-amount-cell",
+        render: (value: string | null | undefined) => value == null
+          ? <span className="payment-amount-pending">待补录</span>
+          : <span>{formatCurrency(value)}</span>,
+      }] : []),
+      ...(isContract ? [{ title: "创建时间", dataIndex: "createdAt", width: 130, className: "linked-time-cell", render: (value: string) => formatDateTime(value) }] : []),
+      { title: "修改时间", dataIndex: "updatedAt", width: 130, className: "linked-time-cell", render: (value: string) => formatDateTime(value) },
       { title: "备注", dataIndex: "notes", width: 130, render: (value) => <CellText value={value} lines={2} /> },
     ];
 
     return <section className="linked-record-panel">
       <div className="linked-record-toolbar">
-        <div><Icon size={18} /><strong>{label}管理</strong><span>{rows.length} 条</span></div>
+        <div><Icon size={18} /><strong>{label}管理</strong><span>{rows.length} 条{!isContract ? ` · 总计 ${formatCurrency(paymentTotal)}${pendingAmountCount ? ` · ${pendingAmountCount} 条待补录` : ""}` : ""}</span></div>
         {user.role === "ADMIN" && detailTarget && detailRecord && <Button
           type="primary"
           className="create-record-button"
@@ -948,6 +975,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           requiredMark={false}
         >
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input className="linked-record-readonly-field" maxLength={191} readOnly={user.role !== "ADMIN"} /></Form.Item>
+          {linkedDetailTarget.kind === "payments" && <Form.Item
+            name="amount"
+            label="金额"
+            rules={[{ required: true, message: "请输入付款金额" }, { type: "number", min: 0.01, message: "付款金额必须大于 0" }]}
+          ><InputNumber className="payment-amount-input linked-record-readonly-field" prefix="¥" min={0.01} max={9999999999999.99} precision={2} step={0.01} controls={false} readOnly={user.role !== "ADMIN"} placeholder="请输入付款金额" /></Form.Item>}
           <Form.Item name="notes" label="备注"><Input.TextArea className="linked-record-readonly-field" rows={3} maxLength={10000} showCount readOnly={user.role !== "ADMIN"} /></Form.Item>
           <div className="linked-record-meta">
             <div><span>创建时间</span><strong>{formatDateTime(linkedDetailRecord.createdAt)}</strong></div>
@@ -1062,6 +1094,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         >
           <div className="linked-create-target"><span>关联对象</span><strong>{linkedOpen?.targetName}</strong></div>
           <Form.Item name="name" label="名称" rules={[{ required: true, message: "请输入名称" }]}><Input maxLength={191} /></Form.Item>
+          {linkedOpen?.kind === "payments" && <Form.Item
+            name="amount"
+            label="金额"
+            rules={[{ required: true, message: "请输入付款金额" }, { type: "number", min: 0.01, message: "付款金额必须大于 0" }]}
+          ><InputNumber className="payment-amount-input" prefix="¥" min={0.01} max={9999999999999.99} precision={2} step={0.01} controls={false} placeholder="请输入付款金额" /></Form.Item>}
           <Form.Item name="notes" label="备注"><Input.TextArea rows={3} maxLength={10000} showCount /></Form.Item>
           <Form.Item name="record" label={linkedOpen?.kind === "contracts" ? "合同附件" : "付款附件"} valuePropName="fileList" getValueFromEvent={(event) => event?.fileList}><Upload multiple maxCount={20} beforeUpload={() => false}><Button icon={<Paperclip size={16} />}>选择附件</Button></Upload></Form.Item>
           <div className="modal-actions"><Button onClick={() => setLinkedOpen(null)}>取消</Button><Button type="primary" htmlType="submit" loading={linkedMutation.isPending}>{linkedOpen?.kind === "contracts" ? "保存合同" : "保存付款"}</Button></div>
