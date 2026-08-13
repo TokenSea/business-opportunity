@@ -1,0 +1,266 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: business-opportunity-kaniko
+  namespace: default
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: CACHE_REPO
+      type: string
+      default: tokensea.tencentcloudcr.com/tokensea/business-opportunity-cache
+  workspaces:
+    - name: source
+    - name: dockerconfig
+      mountPath: /kaniko/.docker
+  steps:
+    - name: build-and-push
+      image: tokensea.tencentcloudcr.com/tektoncd/kaniko-project/executor:v1.5.1
+      workingDir: $(workspaces.source.path)
+      securityContext:
+        runAsUser: 0
+      args:
+        - --dockerfile=Dockerfile
+        - --context=$(workspaces.source.path)
+        - --destination=$(params.IMAGE)
+        - --cache=true
+        - --cache-repo=$(params.CACHE_REPO)
+        - --registry-mirror=mirror.ccs.tencentyun.com
+        - --registry-mirror=reg-mirror.qiniu.com
+        - --registry-mirror=docker.mirrors.ustc.edu.cn
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: business-opportunity-deploy
+  namespace: default
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: NAMESPACE
+      type: string
+      default: tokensea
+    - name: REPLICAS
+      type: string
+      default: "1"
+  workspaces:
+    - name: kubeconfig
+  steps:
+    - name: update
+      image: tokensea.tencentcloudcr.com/tektoncd/bitnami/kubectl:latest
+      script: |
+        #!/bin/bash
+        set -euo pipefail
+        export KUBECONFIG="$(workspaces.kubeconfig.path)/kubeconfig"
+        kubectl set image deployment/business-opportunity \
+          migrate="$(params.IMAGE)" \
+          business-opportunity="$(params.IMAGE)" \
+          -n "$(params.NAMESPACE)"
+        kubectl scale deployment/business-opportunity \
+          --replicas="$(params.REPLICAS)" \
+          -n "$(params.NAMESPACE)"
+---
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: business-opportunity-pipeline
+  namespace: default
+spec:
+  params:
+    - name: git-url
+      type: string
+    - name: git-revision
+      type: string
+      default: refs/heads/develop
+    - name: image-url
+      type: string
+    - name: namespace
+      type: string
+      default: tokensea
+  workspaces:
+    - name: shared-workspace
+    - name: ssh-credentials
+    - name: dockerconfig
+    - name: kubeconfig
+  tasks:
+    - name: clone-repo
+      taskRef:
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.git-url)
+        - name: revision
+          value: $(params.git-revision)
+        - name: deleteExisting
+          value: "true"
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+        - name: ssh-directory
+          workspace: ssh-credentials
+    - name: build-and-push
+      runAfter:
+        - clone-repo
+      taskRef:
+        name: business-opportunity-kaniko
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+        - name: dockerconfig
+          workspace: dockerconfig
+    - name: deploy
+      runAfter:
+        - build-and-push
+      taskRef:
+        name: business-opportunity-deploy
+      params:
+        - name: IMAGE
+          value: $(params.image-url)
+        - name: NAMESPACE
+          value: $(params.namespace)
+        - name: REPLICAS
+          value: "1"
+      workspaces:
+        - name: kubeconfig
+          workspace: kubeconfig
+    - name: verify
+      runAfter:
+        - deploy
+      taskRef:
+        name: kubectl-verify
+      params:
+        - name: deployment
+          value: business-opportunity
+        - name: namespace
+          value: $(params.namespace)
+        - name: timeout
+          value: "300"
+      workspaces:
+        - name: kubeconfig
+          workspace: kubeconfig
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerBinding
+metadata:
+  name: business-opportunity-binding
+  namespace: default
+spec:
+  params:
+    - name: git-url
+      value: $(body.repository.ssh_url)
+    - name: git-revision
+      value: $(body.ref)
+    - name: image-url
+      value: tokensea.tencentcloudcr.com/tokensea/business-opportunity:$(body.head_commit.id)
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: business-opportunity-pipeline-template
+  namespace: default
+spec:
+  params:
+    - name: git-url
+    - name: git-revision
+      default: refs/heads/develop
+    - name: image-url
+    - name: namespace
+      default: tokensea
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: business-opportunity-
+        namespace: default
+        labels:
+          app: business-opportunity
+          triggers.tekton.dev/trigger: business-opportunity-develop
+      spec:
+        pipelineRef:
+          name: business-opportunity-pipeline
+        taskRunTemplate:
+          serviceAccountName: github-bot
+        timeouts:
+          pipeline: 2h0m0s
+        params:
+          - name: git-url
+            value: $(tt.params.git-url)
+          - name: git-revision
+            value: $(tt.params.git-revision)
+          - name: image-url
+            value: $(tt.params.image-url)
+          - name: namespace
+            value: $(tt.params.namespace)
+        workspaces:
+          - name: shared-workspace
+            persistentVolumeClaim:
+              claimName: tekton-shared-workspace
+          - name: ssh-credentials
+            secret:
+              secretName: github-ssh-secret-business-opportunity
+          - name: dockerconfig
+            secret:
+              secretName: image-secret
+              items:
+                - key: .dockerconfigjson
+                  path: config.json
+          - name: kubeconfig
+            secret:
+              secretName: kubeconfig-secret
+---
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: business-opportunity-listener
+  namespace: default
+spec:
+  serviceAccountName: tekton-triggers-github-sa
+  triggers:
+    - name: github-push-develop-trigger
+      bindings:
+        - ref: business-opportunity-binding
+          kind: TriggerBinding
+      interceptors:
+        - ref:
+            name: github
+            kind: ClusterInterceptor
+            apiVersion: triggers.tekton.dev
+          params:
+            - name: secretRef
+              value:
+                secretName: business-opportunity-webhook-secret
+                secretKey: secret
+            - name: eventTypes
+              value:
+                - push
+        - ref:
+            name: cel
+            kind: ClusterInterceptor
+            apiVersion: triggers.tekton.dev
+          params:
+            - name: filter
+              value: body.repository.full_name == 'TokenSea/business-opportunity' && body.ref == 'refs/heads/develop'
+      template:
+        ref: business-opportunity-pipeline-template
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: business-opportunity-listener-service
+  namespace: default
+  labels:
+    app: business-opportunity-listener
+spec:
+  type: LoadBalancer
+  selector:
+    eventlistener: business-opportunity-listener
+  ports:
+    - name: http-listener
+      port: 8080
+      targetPort: 8080
+
