@@ -33,6 +33,7 @@ export type Supplier = {
 export type LinkedRecord = {
   id: string;
   name: string;
+  amount?: string | null;
   notes: string | null;
   type: PartyType;
   opportunityId: string | null;

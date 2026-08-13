@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { apiError, requireApiUser } from "@/lib/api";
 import { removeStoredFiles } from "@/lib/files";
 import { prisma } from "@/lib/prisma";
-import { deleteIdsSchema, linkedRecordSchema } from "@/lib/validators";
+import { deleteIdsSchema, paymentRecordSchema } from "@/lib/validators";
 
 export async function GET() {
   const auth = await requireApiUser();
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: "仅管理员可以新增付款记录" }, { status: 403 });
   }
   try {
-    const input = linkedRecordSchema.parse(await request.json());
+    const input = paymentRecordSchema.parse(await request.json());
     const attachmentIds = Array.from(new Set([
       ...input.attachmentIds,
       ...(input.recordFileId ? [input.recordFileId] : []),
@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       const payment = await tx.payment.create({
         data: {
           name: input.name,
+          amount: input.amount,
           notes: input.notes || null,
           type: input.type,
           opportunityId: input.type === "CUSTOMER" ? input.targetId : null,
