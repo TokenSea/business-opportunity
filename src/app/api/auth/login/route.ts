@@ -9,7 +9,7 @@ export async function POST(request: Request) {
   try {
     const input = loginSchema.parse(await request.json());
     const user = await prisma.user.findUnique({ where: { username: input.username } });
-    if (!user?.enabled || !(await verify(user.passwordHash, input.password))) {
+    if (!user?.enabled || user.deletedAt || !(await verify(user.passwordHash, input.password))) {
       return NextResponse.json({ message: "账号或密码错误" }, { status: 401 });
     }
     await createSession({ id: user.id, username: user.username, role: user.role });

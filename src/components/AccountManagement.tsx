@@ -2,8 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { App, Button, Form, Input, Modal, Pagination, Select, Switch, Table, Tag, type TableColumnsType } from "antd";
-import { KeyRound, Plus, RotateCcw, Search, ShieldCheck } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { KeyRound, Plus, RotateCcw, Search, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type Key } from "react";
 import type { SessionUser } from "@/lib/auth";
 
 type ManagedUser = {
@@ -55,6 +55,7 @@ export function AccountManagement({ currentUser }: { currentUser: SessionUser })
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("ALL");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [page, setPage] = useState(1);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [createForm] = Form.useForm<CreateUserForm>();
   const [resetForm] = Form.useForm<{ password: string; confirmPassword: string }>();
 
@@ -105,6 +106,21 @@ export function AccountManagement({ currentUser }: { currentUser: SessionUser })
     onError: (error) => message.error(error.message),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (ids: string[]) => requestJson<{ deleted: number }>("/api/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }),
+    onSuccess: async (result) => {
+      message.success(`已删除 ${result.deleted} 个账号`);
+      setSelectedIds([]);
+      setPage(1);
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (error) => message.error(error.message),
+  });
+
   const users = usersQuery.data || [];
   const filteredUsers = useMemo(() => {
     const normalized = keyword.trim().toLowerCase();
@@ -144,6 +160,18 @@ export function AccountManagement({ currentUser }: { currentUser: SessionUser })
       cancelText: "取消",
       okButtonProps: enabled ? undefined : { danger: true },
       onOk: () => updateMutation.mutateAsync({ id: row.id, enabled }),
+    });
+  }
+
+  function confirmDelete() {
+    if (!selectedIds.length) return;
+    modal.confirm({
+      title: "删除已选账号",
+      content: `确认删除已选的 ${selectedIds.length} 个账号吗？删除后账号将无法登录，关联的业务与审计记录会继续保留。`,
+      okText: "删除",
+      cancelText: "取消",
+      okButtonProps: { danger: true },
+      onOk: () => deleteMutation.mutateAsync(selectedIds),
     });
   }
 
@@ -205,6 +233,7 @@ export function AccountManagement({ currentUser }: { currentUser: SessionUser })
       <Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={() => {
         setCreateOpen(true);
       }}>新建账号</Button>
+      <Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.length} loading={deleteMutation.isPending} onClick={confirmDelete}>删除账号{selectedIds.length ? ` (${selectedIds.length})` : ""}</Button>
       <div className="toolbar-spacer" />
       <Input className="search-input" prefix={<Search size={16} />} placeholder="搜索账号" value={keyword} onChange={(event) => { setKeyword(event.target.value); setPage(1); }} allowClear />
       <Select
@@ -224,15 +253,22 @@ export function AccountManagement({ currentUser }: { currentUser: SessionUser })
     <div className="table-holder account-table-holder">
       <Table
         rowKey="id"
+        rowSelection={{
+          columnWidth: 48,
+          preserveSelectedRowKeys: true,
+          selectedRowKeys: selectedIds,
+          getCheckboxProps: (row) => ({ disabled: row.id === currentUser.id, title: row.id === currentUser.id ? "不能删除当前登录账号" : undefined }),
+          onChange: (keys: Key[]) => setSelectedIds(keys.map(String)),
+        }}
         columns={columns}
         dataSource={pagedUsers}
         loading={usersQuery.isLoading}
         pagination={false}
         tableLayout="fixed"
-        scroll={{ x: 940 }}
+        scroll={{ x: 988 }}
       />
     </div>
-    <div className="table-footer"><span>共 {filteredUsers.length} 个账号</span><span className="account-security-note"><ShieldCheck size={15} />账号只能停用，业务及审计记录会被保留</span><Pagination current={page} pageSize={PAGE_SIZE} total={filteredUsers.length} showSizeChanger={false} onChange={setPage} /></div>
+    <div className="table-footer"><span>共 {filteredUsers.length} 个账号</span><span className="account-security-note"><ShieldCheck size={15} />删除账号不会删除关联的业务及审计记录</span><Pagination current={page} pageSize={PAGE_SIZE} total={filteredUsers.length} showSizeChanger={false} onChange={setPage} /></div>
 
     <Modal title="新建账号" open={createOpen} onCancel={() => { setCreateOpen(false); createForm.resetFields(); }} footer={null} centered destroyOnHidden>
       <Form form={createForm} layout="vertical" onFinish={(values) => createMutation.mutate(values)} requiredMark={false} initialValues={{ role: "USER" }}>

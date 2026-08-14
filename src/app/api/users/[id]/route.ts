@@ -15,16 +15,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const user = await prisma.$transaction(async (tx) => {
       const current = await tx.user.findUnique({
         where: { id },
-        select: { id: true, username: true, role: true, enabled: true },
+        select: { id: true, username: true, role: true, enabled: true, deletedAt: true },
       });
-      if (!current) throw new Error("USER_NOT_FOUND");
+      if (!current || current.deletedAt) throw new Error("USER_NOT_FOUND");
 
       const nextRole = input.role ?? current.role;
       const nextEnabled = input.enabled ?? current.enabled;
       if (id === auth.user.id && (nextRole !== "ADMIN" || !nextEnabled)) throw new Error("CANNOT_DISABLE_SELF");
 
       if (current.role === "ADMIN" && current.enabled && (nextRole !== "ADMIN" || !nextEnabled)) {
-        const enabledAdminCount = await tx.user.count({ where: { role: "ADMIN", enabled: true } });
+        const enabledAdminCount = await tx.user.count({ where: { role: "ADMIN", enabled: true, deletedAt: null } });
         if (enabledAdminCount <= 1) throw new Error("LAST_ENABLED_ADMIN");
       }
 

@@ -12,7 +12,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   try {
     const { id } = await context.params;
     const input = resetUserPasswordSchema.parse(await request.json());
-    const target = await prisma.user.findUnique({ where: { id }, select: { id: true, username: true } });
+    const target = await prisma.user.findFirst({ where: { id, deletedAt: null }, select: { id: true, username: true } });
     if (!target) return NextResponse.json({ message: "账号不存在" }, { status: 404 });
 
     const passwordHash = await hash(input.password, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
