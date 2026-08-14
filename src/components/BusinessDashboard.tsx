@@ -16,6 +16,7 @@ import {
   Search,
   Sparkles,
   Trash2,
+  Users,
   Warehouse,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -39,11 +40,14 @@ import {
 } from "antd";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type Key } from "react";
+import { AccountManagement } from "@/components/AccountManagement";
+import { ChangePasswordModal } from "@/components/ChangePasswordModal";
 import type { SessionUser } from "@/lib/auth";
 import type { AttachmentRef, LinkedRecord, Opportunity, OpportunityStatus, PartyType, Supplier } from "@/types/business";
 
 type PageKey = "opportunities" | "contracts" | "payments" | "suppliers";
-type VisiblePageKey = "opportunities" | "suppliers";
+type BusinessPageKey = "opportunities" | "suppliers";
+type VisiblePageKey = BusinessPageKey | "accounts";
 type OpportunityForm = Omit<Opportunity, "id" | "attachments" | "createdAt" | "updatedAt">;
 type SupplierForm = {
   name: string;
@@ -64,6 +68,7 @@ const PAGE_SIZE = 8;
 const pageInfo: Record<VisiblePageKey, { title: string; subtitle: string }> = {
   opportunities: { title: "商机管理", subtitle: "点击任意商机查看基本信息、合同、付款及相关资料" },
   suppliers: { title: "供应商管理", subtitle: "点击任意供应商查看基本信息、合同与付款记录" },
+  accounts: { title: "账号管理", subtitle: "创建账号、分配角色、控制访问状态并重置密码" },
 };
 
 const statusText: Record<OpportunityStatus, string> = {
@@ -171,23 +176,33 @@ function EditableTextCell({
 function EditablePasswordCell({
   editable,
   onSave,
-  onReveal,
+  value,
+  loading = false,
+  loadFailed = false,
   label = "密码",
   hasValue = true,
 }: {
   editable: boolean;
   onSave: (value: string) => Promise<void>;
-  onReveal?: () => Promise<string>;
+  value?: string;
+  loading?: boolean;
+  loadFailed?: boolean;
   label?: string;
   hasValue?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
-  const [revealed, setRevealed] = useState<string | null>(null);
-  const [revealing, setRevealing] = useState(false);
   const masked = <span className="masked-password">••••••••</span>;
-  const displayed = hasValue ? masked : <span className="cell-empty">—</span>;
+  const displayed = !hasValue
+    ? <span className="cell-empty">—</span>
+    : !editable
+      ? masked
+      : loading
+        ? <span className="cell-empty">读取中…</span>
+        : loadFailed
+          ? <span className="cell-empty">读取失败</span>
+          : <span className="password-plain-text">{value}</span>;
   if (!editable) return displayed;
 
   async function save() {
@@ -197,21 +212,8 @@ function EditablePasswordCell({
       await onSave(draft);
       setEditing(false);
       setDraft("");
-      setRevealed(null);
     } finally {
       setSaving(false);
-    }
-  }
-
-  async function reveal() {
-    if (!onReveal) return;
-    setRevealing(true);
-    try {
-      setRevealed(await onReveal());
-    } catch {
-      // The parent displays the request error.
-    } finally {
-      setRevealing(false);
     }
   }
 
@@ -221,19 +223,14 @@ function EditablePasswordCell({
     aria-label={`修改${label}`}
     onClick={() => {
       setDraft("");
-      setRevealed(null);
       setEditing(true);
     }}
   >{displayed}</button>;
 
   return <div className="detail-inline-editor detail-inline-password-editor">
-    {onReveal && hasValue && <div className="password-reveal-row">
-      <Input aria-label={`${label}明文`} value={revealed ?? "••••••••"} readOnly />
-      <Button size="small" icon={<Eye size={14} />} loading={revealing} disabled={revealed !== null} onClick={() => void reveal()}>{revealed !== null ? "已显示" : "查看"}</Button>
-    </div>}
     <Input.Password aria-label={`编辑${label}`} value={draft} placeholder={`请输入新${label}`} onChange={(event) => setDraft(event.target.value)} onPressEnter={() => void save()} autoFocus />
     <div className="detail-inline-editor-actions">
-      <Button size="small" onClick={() => { setDraft(""); setRevealed(null); setEditing(false); }}>取消</Button>
+      <Button size="small" onClick={() => { setDraft(""); setEditing(false); }}>取消</Button>
       <Button size="small" type="primary" disabled={!draft} loading={saving} onClick={() => void save()}>保存</Button>
     </div>
   </div>;
@@ -311,7 +308,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   const [supplierOpen, setSupplierOpen] = useState(false);
   const [linkedOpen, setLinkedOpen] = useState<LinkedCreateTarget | null>(null);
   const [linkedDetailTarget, setLinkedDetailTarget] = useState<{ kind: "contracts" | "payments"; id: string } | null>(null);
-  const [detailTarget, setDetailTarget] = useState<{ kind: VisiblePageKey; id: string } | null>(null);
+  const [detailTarget, setDetailTarget] = useState<{ kind: BusinessPageKey; id: string } | null>(null);
   const [relatedView, setRelatedView] = useState<"contracts" | "payments">("contracts");
   const [attachmentTarget, setAttachmentTarget] = useState<{ kind: AttachmentKind; id: string } | null>(null);
   const [previewFile, setPreviewFile] = useState<AttachmentRef | null>(null);
@@ -349,6 +346,13 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
       ? contracts.find((item) => item.id === linkedDetailTarget.id)
       : payments.find((item) => item.id === linkedDetailTarget.id)
     : null;
+  const selectedSupplierId = detailTarget?.kind === "suppliers" ? detailTarget.id : null;
+  const supplierPasswordQuery = useQuery({
+    queryKey: ["supplier-website-password", selectedSupplierId],
+    queryFn: () => requestJson<{ password: string }>(`/api/suppliers/${selectedSupplierId}/website-password`),
+    enabled: user.role === "ADMIN" && Boolean(selectedSupplierId && detailRecord && "name" in detailRecord && detailRecord.websitePassword),
+    retry: false,
+  });
 
   useEffect(() => {
     if (linkedDetailRecord) linkedDetailForm.setFieldsValue({
@@ -514,9 +518,14 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         [field]: value,
       }),
     }),
-    onSuccess: async () => {
+    onSuccess: async (_, variables) => {
       message.success("字段已更新");
-      await invalidateBusiness();
+      await Promise.all([
+        invalidateBusiness(),
+        ...(variables.field === "websitePassword"
+          ? [queryClient.invalidateQueries({ queryKey: ["supplier-website-password", variables.row.id] })]
+          : []),
+      ]);
     },
     onError: (error) => message.error(error.message),
   });
@@ -605,16 +614,6 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     await inlineSupplierMutation.mutateAsync({ row, field, value });
   }
 
-  async function revealSupplierWebsitePassword(row: Supplier) {
-    try {
-      const result = await requestJson<{ password: string }>(`/api/suppliers/${row.id}/website-password`);
-      return result.password;
-    } catch (error) {
-      message.error(error instanceof Error ? error.message : "官网密码读取失败");
-      throw error;
-    }
-  }
-
   const opportunityColumns: TableColumnsType<Opportunity> = [
     { title: "客户", dataIndex: "customer", width: 180, className: "strong-cell", render: (value) => <CellText value={value} /> },
     { title: "需求与现状", dataIndex: "requirement", width: 300, render: (value) => <CellText value={value} lines={2} /> },
@@ -635,7 +634,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
     { title: "更新时间", dataIndex: "updatedAt", width: 130, render: (value: string) => formatDate(value) },
   ];
 
-  function openDetail(kind: VisiblePageKey, id: string) {
+  function openDetail(kind: BusinessPageKey, id: string) {
     setRelatedView("contracts");
     setLinkedDetailTarget(null);
     setDetailTarget({ kind, id });
@@ -669,8 +668,9 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
   }
 
   const navItems = [
-    { key: "opportunities" as const, label: "商机管理", icon: BriefcaseBusiness, count: opportunities.length },
-    { key: "suppliers" as const, label: "供应商管理", icon: Warehouse, count: suppliers.length },
+    { key: "opportunities" as VisiblePageKey, label: "商机管理", icon: BriefcaseBusiness, count: opportunities.length },
+    { key: "suppliers" as VisiblePageKey, label: "供应商管理", icon: Warehouse, count: suppliers.length },
+    ...(user.role === "ADMIN" ? [{ key: "accounts" as VisiblePageKey, label: "账号管理", icon: Users, count: null }] : []),
   ];
 
   function renderLinkedSection(kind: "contracts" | "payments", rows: LinkedRecord[]) {
@@ -745,11 +745,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
           <div className="brand"><span className="brand-mark"><Sparkles size={20} /></span><span>商机云台</span></div>
           <nav className="header-links"><button>首页</button><button>关于</button></nav>
           <div className="header-actions"><button aria-label="通知"><Bell size={18} /></button><button aria-label="帮助"><CircleHelp size={18} /></button></div>
-          <div className="user-summary"><span>{user.username.slice(0, 1).toUpperCase()}</span><div><b>{user.username}</b><small>{user.role === "ADMIN" ? "管理员" : "普通用户"}</small></div><button aria-label="退出登录" onClick={logout}><LogOut size={17} /></button></div>
+          <div className="user-summary"><ChangePasswordModal /><div className="user-identity"><span>{user.username.slice(0, 1).toUpperCase()}</span><div><b>{user.username}</b><small>{user.role === "ADMIN" ? "管理员" : "普通用户"}</small></div></div><button type="button" aria-label="退出登录" onClick={logout}><LogOut size={17} /></button></div>
         </header>
         <div className="workspace">
           <aside className="sidebar">
-            {navItems.map((item) => <button key={item.key} className={page === item.key ? "active" : ""} onClick={() => setPage(item.key)}><item.icon size={18} /><span>{item.label}</span><small>{item.count}</small></button>)}
+            {navItems.map((item) => <button key={item.key} className={page === item.key ? "active" : ""} onClick={() => setPage(item.key)}><item.icon size={18} /><span>{item.label}</span>{item.count !== null && <small>{item.count}</small>}</button>)}
           </aside>
           <main className="main-area">
             <section className="business-panel">
@@ -757,8 +757,8 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
 
               {page === "opportunities" && <>
                 <div className="table-toolbar">
-                  <Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openOpportunityCreate}>新建商机</Button>
-                  <Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.opportunities.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "opportunities"} onClick={() => confirmDelete("opportunities")}>删除商机{selectedIds.opportunities.length ? ` (${selectedIds.opportunities.length})` : ""}</Button>
+                  {user.role === "ADMIN" && <><Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openOpportunityCreate}>新建商机</Button>
+                  <Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.opportunities.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "opportunities"} onClick={() => confirmDelete("opportunities")}>删除商机{selectedIds.opportunities.length ? ` (${selectedIds.opportunities.length})` : ""}</Button></>}
                   <div className="toolbar-spacer" />
                   <Input className="search-input" prefix={<Search size={16} />} placeholder="搜索客户、需求或进展" value={keywords.opportunities} onChange={(event) => changeKeyword("opportunities", event.target.value)} allowClear />
                   <Select value={status} onChange={(value) => { setStatus(value); changePage("opportunities", 1); }} options={[{ value: "ALL", label: "全部状态" }, ...Object.entries(statusText).map(([value, label]) => ({ value, label }))]} />
@@ -766,7 +766,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                 </div>
                 <div className="table-holder"><Table
                   rowKey="id"
-                  rowSelection={rowSelectionFor("opportunities")}
+                  rowSelection={user.role === "ADMIN" ? rowSelectionFor("opportunities") : undefined}
                   columns={opportunityColumns}
                   dataSource={pagedOpportunities}
                   loading={opportunitiesQuery.isLoading}
@@ -785,10 +785,10 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               </>}
 
               {page === "suppliers" && <>
-                <div className="table-toolbar"><Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openSupplierCreate}>新建供应商</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.suppliers.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "suppliers"} onClick={() => confirmDelete("suppliers")}>删除供应商{selectedIds.suppliers.length ? ` (${selectedIds.suppliers.length})` : ""}</Button><div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称、银行卡、官网或备注" value={keywords.suppliers} onChange={(event) => changeKeyword("suppliers", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("suppliers", "")}>重置</Button></div>
+                <div className="table-toolbar">{user.role === "ADMIN" && <><Button type="primary" className="create-record-button" icon={<Plus size={16} />} onClick={openSupplierCreate}>新建供应商</Button><Button danger icon={<Trash2 size={16} />} disabled={!selectedIds.suppliers.length} loading={deleteMutation.isPending && deleteMutation.variables?.kind === "suppliers"} onClick={() => confirmDelete("suppliers")}>删除供应商{selectedIds.suppliers.length ? ` (${selectedIds.suppliers.length})` : ""}</Button></>}<div className="toolbar-spacer" /><Input className="search-input" prefix={<Search size={16} />} placeholder="搜索名称、银行卡、官网或备注" value={keywords.suppliers} onChange={(event) => changeKeyword("suppliers", event.target.value)} allowClear /><Button icon={<RotateCcw size={16} />} onClick={() => changeKeyword("suppliers", "")}>重置</Button></div>
                 <div className="table-holder"><Table
                   rowKey="id"
-                  rowSelection={rowSelectionFor("suppliers")}
+                  rowSelection={user.role === "ADMIN" ? rowSelectionFor("suppliers") : undefined}
                   columns={supplierColumns}
                   dataSource={pagedSuppliers}
                   loading={suppliersQuery.isLoading}
@@ -805,6 +805,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                 /></div>
                 <div className="table-footer"><span>共 {filteredSuppliers.length} 条</span><Pagination current={pageNumbers.suppliers} total={filteredSuppliers.length} pageSize={PAGE_SIZE} showSizeChanger={false} onChange={(current) => changePage("suppliers", current)} /></div>
               </>}
+              {page === "accounts" && user.role === "ADMIN" && <AccountManagement currentUser={user} />}
             </section>
           </main>
         </div>
@@ -872,7 +873,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               <div className="detail-field"><span>供应商名称</span><EditableTextCell value={detailRecord.name} editable={user.role === "ADMIN"} label="名称" onSave={(next) => saveSupplierField(detailRecord, "name", next)} /></div>
               <div className="detail-field"><span>银行卡账号</span><EditableTextCell value={detailRecord.bankAccount} editable={user.role === "ADMIN"} label="银行卡账号" onSave={(next) => saveSupplierField(detailRecord, "bankAccount", next)} /></div>
               <div className="detail-field"><span>官网账号</span><EditableTextCell value={detailRecord.websiteAccount} editable={user.role === "ADMIN"} label="官网账号" onSave={(next) => saveSupplierField(detailRecord, "websiteAccount", next)} /></div>
-              <div className="detail-field"><span>官网密码</span><EditablePasswordCell editable={user.role === "ADMIN"} label="官网密码" hasValue={Boolean(detailRecord.websitePassword)} onReveal={() => revealSupplierWebsitePassword(detailRecord)} onSave={(next) => saveSupplierField(detailRecord, "websitePassword", next)} /></div>
+              <div className="detail-field"><span>官网密码</span><EditablePasswordCell editable={user.role === "ADMIN"} label="官网密码" hasValue={Boolean(detailRecord.websitePassword)} value={supplierPasswordQuery.data?.password} loading={supplierPasswordQuery.isLoading} loadFailed={supplierPasswordQuery.isError} onSave={(next) => saveSupplierField(detailRecord, "websitePassword", next)} /></div>
               <div className="detail-field detail-field-wide"><span>官网地址</span><EditableTextCell value={detailRecord.websiteUrl} editable={user.role === "ADMIN"} label="官网地址" onSave={(next) => saveSupplierField(detailRecord, "websiteUrl", next)} /></div>
               <div className="detail-field detail-field-wide"><span>备注</span><EditableTextCell value={detailRecord.notes} lines={2} editable={user.role === "ADMIN"} label="备注" onSave={(next) => saveSupplierField(detailRecord, "notes", next)} /></div>
               <div className="detail-field"><span>创建时间</span><b>{formatDateTime(detailRecord.createdAt)}</b></div>
@@ -912,7 +913,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
         {managedAttachmentRecord && attachmentTarget && <div className="attachment-manager">
           <div className="attachment-manager-header">
             <div><strong>{managedAttachmentName}</strong><span>共 {managedAttachmentRecord.attachments.length} 个附件</span></div>
-            <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id ? " is-loading" : ""}`}>
+            {user.role === "ADMIN" && <label className={`attachment-manager-upload${attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id ? " is-loading" : ""}`}>
               <input
                 type="file"
                 accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
@@ -925,11 +926,11 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
               />
               <Plus size={15} />
               {attachmentMutation.isPending && attachmentMutation.variables?.kind === attachmentTarget.kind && attachmentMutation.variables?.rowId === attachmentTarget.id ? "上传中…" : "上传附件"}
-            </label>
+            </label>}
           </div>
 
           {managedAttachmentRecord.attachments.length === 0
-            ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件，点击右上角上传" />
+            ? <Empty className="attachment-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={user.role === "ADMIN" ? "暂无附件，点击右上角上传" : "暂无附件"} />
             : <div className="attachment-list">{managedAttachmentRecord.attachments.map((file) => <div className="attachment-list-item" key={file.id}>
               <span className="attachment-file-icon"><FileText size={19} /></span>
               <div className="attachment-file-info"><Tooltip title={file.originalName}><span className="attachment-file-name">{file.originalName}</span></Tooltip><small>上传于 {formatDateTime(file.createdAt)}</small></div>
@@ -951,7 +952,7 @@ export function BusinessDashboard({ user }: { user: SessionUser }) {
                 })}
               >删除</Button>}
             </div>)}</div>}
-          <p className="attachment-manager-tip">支持 PDF、Word、Excel、JPG、PNG、WebP，单个文件最大 20MB。</p>
+          <p className="attachment-manager-tip">{user.role === "ADMIN" ? "支持 PDF、Word、Excel、JPG、PNG、WebP，单个文件最大 20MB。" : "普通用户仅可预览和下载附件。"}</p>
         </div>}
       </Modal>
 

@@ -17,6 +17,7 @@ export async function GET() {
 export async function POST(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") return NextResponse.json({ message: "仅管理员可以新增商机" }, { status: 403 });
   try {
     const input = opportunitySchema.parse(await request.json());
     const row = await prisma.$transaction(async (tx) => {
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") return NextResponse.json({ message: "仅管理员可以删除商机" }, { status: 403 });
   try {
     const { ids } = deleteIdsSchema.parse(await request.json());
     const rows = await prisma.opportunity.findMany({

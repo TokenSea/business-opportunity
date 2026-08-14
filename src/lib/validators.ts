@@ -5,11 +5,6 @@ export const loginSchema = z.object({
   password: z.string().min(6).max(128),
 });
 
-export const registerSchema = z.object({
-  username: z.string().trim().min(2).max(64),
-  password: z.string().min(8).max(128),
-});
-
 export const opportunitySchema = z.object({
   customer: z.string().trim().min(1).max(191),
   requirement: z.string().trim().max(10000).optional().default(""),
@@ -70,4 +65,20 @@ export const userSchema = z.object({
   username: z.string().trim().min(2).max(64),
   password: z.string().min(8).max(128),
   role: z.enum(["ADMIN", "USER"]).default("USER"),
+});
+
+export const userUpdateSchema = z.object({
+  role: z.enum(["ADMIN", "USER"]).optional(),
+  enabled: z.boolean().optional(),
+}).refine((input) => input.role !== undefined || input.enabled !== undefined, {
+  message: "至少提交一个需要修改的字段",
+});
+
+export const resetUserPasswordSchema = z.object({
+  password: z.string().min(8).max(128),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(128),
+  newPassword: z.string().min(8).max(128),
 });

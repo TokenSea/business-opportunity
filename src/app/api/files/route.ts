@@ -20,6 +20,7 @@ const ALLOWED_TYPES = new Set([
 export async function POST(request: Request) {
   const auth = await requireApiUser();
   if (auth.error) return auth.error;
+  if (auth.user.role !== "ADMIN") return NextResponse.json({ message: "仅管理员可以上传附件" }, { status: 403 });
   try {
     const form = await request.formData();
     const file = form.get("file");
